@@ -1,0 +1,31 @@
+{
+  "users": [
+    { "id": 1, "name": "Alice Admin", "email": "alice@example.com" },
+    { "id": 2, "name": "Bob Builder", "email": "bob@example.com" },
+    { "id": 3, "name": "Carol Care", "email": "carol@example.com" },
+    { "id": 4, "name": "Dan Desk", "email": "dan@example.com" },
+    { "id": 5, "name": "Eve Escalation", "email": "eve@example.com" }
+  ],
+  "tickets": [
+    { "id": 1, "title": "VPN drops every afternoon", "customer": "Acme Corp", "priority": "high", "status": "open", "assigneeId": 2, "createdAt": "2025-05-01T09:15:00.000Z" },
+    { "id": 2, "title": "Printer not found on floor 3", "customer": "Globex", "priority": "low", "status": "open", "assigneeId": 3, "createdAt": "2025-05-02T11:40:00.000Z" },
+    { "id": 3, "title": "Email delay to external domains", "customer": "Initech", "priority": "medium", "status": "in progress", "assigneeId": 1, "createdAt": "2025-05-03T14:05:00.000Z" },
+    { "id": 4, "title": "New hire laptop setup", "customer": "Umbrella", "priority": "medium", "status": "resolved", "assigneeId": 4, "createdAt": "2025-05-04T08:30:00.000Z" },
+    { "id": 5, "title": "Teams audio cutting out", "customer": "Acme Corp", "priority": "high", "status": "open", "assigneeId": 5, "createdAt": "2025-05-05T16:22:00.000Z" },
+    { "id": 6, "title": "Shared drive permission error", "customer": "Globex", "priority": "low", "status": "open", "assigneeId": 2, "createdAt": "2025-05-06T10:10:00.000Z" },
+    { "id": 7, "title": "Monitor flicker on dock", "customer": "Initech", "priority": "low", "status": "in progress", "assigneeId": 3, "createdAt": "2025-05-07T13:00:00.000Z" },
+    { "id": 8, "title": "Password reset loop", "customer": "Umbrella", "priority": "high", "status": "open", "assigneeId": 1, "createdAt": "2025-05-08T09:45:00.000Z" },
+    { "id": 9, "title": "Wi‑Fi guest access request", "customer": "Acme Corp", "priority": "medium", "status": "resolved", "assigneeId": 4, "createdAt": "2025-05-09T12:12:00.000Z" },
+    { "id": 10, "title": "Backup job failed overnight", "customer": "Globex", "priority": "high", "status": "open", "assigneeId": 5, "createdAt": "2025-05-10T07:55:00.000Z" },
+    { "id": 11, "title": "CRM sync duplicate records", "customer": "Initech", "priority": "medium", "status": "open", "assigneeId": 2, "createdAt": "2025-05-11T15:30:00.000Z" },
+    { "id": 12, "title": "Headset mic too quiet", "customer": "Umbrella", "priority": "low", "status": "in progress", "assigneeId": 3, "createdAt": "2025-05-12T11:11:00.000Z" }
+  ],
+  "comments": [
+    { "id": 1, "ticketId": 1, "authorId": 2, "body": "Reproduced between 2–4pm; collecting logs." },
+    { "id": 2, "ticketId": 1, "authorId": 1, "body": "Escalated to network team." },
+    { "id": 3, "ticketId": 3, "authorId": 3, "body": "MX records look fine; checking SMTP queue." },
+    { "id": 4, "ticketId": 5, "authorId": 5, "body": "Updated audio drivers — monitoring." },
+    { "id": 5, "ticketId": 8, "authorId": 1, "body": "Cleared stale SSO cookies for user." },
+    { "id": 6, "ticketId": 10, "authorId": 4, "body": "Disk full on backup target; purged old snapshots." }
+  ]
+}

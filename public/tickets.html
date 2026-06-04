@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tickets — Deskhub</title>
+  <link rel="stylesheet" href="../styles/main.css" />
+</head>
+<body data-page="tickets-list">
+  <div class="layout layout--wide">
+    <header class="layout__header">
+      <h1 class="layout__title">Tickets</h1>
+      <nav class="layout__nav" aria-label="Primary">
+        <a href="../dashboard.html">Dashboard</a>
+      </nav>
+    </header>
+
+    <main class="layout__main">
+      <section class="tickets-panel" aria-labelledby="tickets-heading">
+        <h2 id="tickets-heading" class="visually-hidden">Ticket list</h2>
+
+        <div class="tickets-toolbar" role="region" aria-label="Search and filters (placeholders)">
+          <label class="tickets-toolbar__item">
+            <span class="tickets-toolbar__label">Search</span>
+            <input type="search" id="ticket-search" placeholder="Search tickets…" disabled />
+          </label>
+          <label class="tickets-toolbar__item">
+            <span class="tickets-toolbar__label">Filter</span>
+            <select id="ticket-filter" disabled>
+              <option>All statuses (coming soon)</option>
+            </select>
+          </label>
+        </div>
+
+        <p id="tickets-loading" class="tickets-state tickets-state--loading" role="status" aria-live="polite" hidden>
+          Loading tickets…
+        </p>
+
+        <div id="tickets-error" class="tickets-state tickets-state--error" role="alert" hidden>
+          <p id="tickets-error-message" class="tickets-state__message"></p>
+          <button type="button" id="tickets-retry" class="btn btn--secondary">Retry</button>
+        </div>
+
+        <p id="tickets-empty" class="tickets-state tickets-state--empty" hidden>No tickets found</p>
+
+        <div id="tickets-table-wrap" class="tickets-table-wrap" hidden>
+          <table class="tickets-table">
+            <caption class="visually-hidden">Support tickets</caption>
+            <thead>
+              <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Title</th>
+                <th scope="col">Customer</th>
+                <th scope="col">Priority</th>
+                <th scope="col">Status</th>
+                <th scope="col">Assignee</th>
+                <th scope="col">Created</th>
+              </tr>
+            </thead>
+            <tbody id="tickets-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="../src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "deskhub",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes serve . -p 5173",
+    "api": "node server.cjs",
+    "verify:api": "node scripts/verify-api.mjs"
+  },
+  "dependencies": {
+    "json-server": "^0.17.4"
+  }
+}
