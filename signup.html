@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create account — Deskhub</title>
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body data-page="signup">
+  <div class="app-shell">
+    <header class="app-bar" role="banner">
+      <span class="app-bar__brand">Deskhub</span>
+    </header>
+    <main class="app-shell__main page page--auth">
+      <header class="page__header">
+        <h1 class="page__title">Create account</h1>
+        <p class="page__lede">Sign up to use the help desk (local demo).</p>
+      </header>
+
+      <section class="panel" aria-labelledby="signup-heading">
+        <h2 id="signup-heading" class="panel__title">Sign up</h2>
+
+        <form id="signup-form" class="form" novalidate>
+          <span id="signup-error" class="form__error" role="alert" aria-live="polite" hidden></span>
+
+          <div class="form__field">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" autocomplete="name" required placeholder="Your name" />
+          </div>
+
+          <div class="form__field">
+            <label for="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              autocomplete="email"
+              required
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <div class="form__field">
+            <label for="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              autocomplete="new-password"
+              required
+              minlength="6"
+              placeholder="••••••••"
+            />
+          </div>
+
+          <div class="form__field">
+            <label for="confirm-password">Confirm password</label>
+            <input
+              type="password"
+              id="confirm-password"
+              name="confirm-password"
+              autocomplete="new-password"
+              required
+              placeholder="••••••••"
+            />
+          </div>
+
+          <button type="submit" class="form__submit">Create account</button>
+        </form>
+
+        <p class="panel__footer">
+          Already have an account? <a href="./index.html">Sign in</a>
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

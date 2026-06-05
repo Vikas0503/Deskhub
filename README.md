@@ -16,7 +16,7 @@ Then open **`/`** (login), **`/dashboard.html`**, or **`/public/tickets.html`**.
 
 **Demo login (local mode):** any **`email`** from `db.json` → `users` (e.g. `alice@example.com`) and password **`password`**.
 
-Data is loaded with `fetch` from **`/db.json`**. Ticket writes (`create` / `update` / `delete` / `addComment`) stay disabled in local mode until you enable the remote API (below).
+Data is loaded with `fetch` from **`db.json`** next to your HTML (URL is derived from the current page; you can set **`window.DESKHUB_DB_JSON_URL`** to override). Ticket writes stay disabled in local mode until you enable the remote API (below).
 
 ## Optional: real HTTP API on port 3001
 

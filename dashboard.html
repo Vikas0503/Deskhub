@@ -7,13 +7,27 @@
   <link rel="stylesheet" href="./styles/main.css" />
 </head>
 <body data-page="dashboard">
-  <main class="page page--dashboard">
-    <p class="dashboard__message">You&apos;re in!</p>
-    <p class="dashboard__actions">
-      <a class="dashboard__link" href="./public/tickets.html">View tickets</a>
-    </p>
-    <button type="button" id="logout-btn" class="form__submit form__submit--secondary">Log out</button>
-  </main>
+  <div class="app-shell">
+    <header class="app-bar" role="banner">
+      <span class="app-bar__brand">Deskhub</span>
+      <nav class="app-bar__nav" aria-label="Primary">
+        <a href="./public/tickets.html" class="app-bar__nav-link app-bar__nav-link--active">Tickets</a>
+        <button type="button" id="logout-btn" class="form__submit form__submit--secondary">Log out</button>
+      </nav>
+    </header>
+    <main class="app-shell__main page page--dashboard">
+      <p class="dashboard__message">You&apos;re in!</p>
+
+      <section class="dashboard-overview" aria-labelledby="overview-heading">
+        <h2 id="overview-heading" class="dashboard-overview__title">Ticket overview</h2>
+        <p id="dashboard-stats-loading" class="dashboard-stats-loading" role="status">Loading ticket counts…</p>
+        <p id="dashboard-stats-error" class="dashboard-stats-error" role="alert" hidden></p>
+        <ul id="dashboard-stats-list" class="stat-grid" hidden></ul>
+      </section>
+
+     <!-- <button type="button" id="logout-btn" class="form__submit form__submit--secondary">Log out</button> -->
+    </main>
+  </div>
 
   <script type="module" src="./src/main.js"></script>
 </body>

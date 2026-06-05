@@ -13,11 +13,6 @@ export function initLoginPage() {
 
   if (!form) return;
 
-  if (auth.isAuthenticated()) {
-    window.location.replace('./dashboard.html');
-    return;
-  }
-
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     setError(errorEl, '');

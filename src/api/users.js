@@ -1,5 +1,5 @@
 import { get } from './client.js';
-import { loadLocalDb } from './localDb.js';
+import { getMergedUsers } from './localPersist.js';
 import { useRemoteApi } from './mode.js';
 
 /** @type {unknown[] | null} */
@@ -13,11 +13,10 @@ export function clearUsersCache() {
   inflight = null;
 }
 
-/** Fetch `/users` once (remote) or load from `db.json` (local). */
+/** Fetch `/users` once (remote) or merged users from seed + registrations (local). */
 export async function ensureUsersLoaded() {
   if (!useRemoteApi()) {
-    const db = await loadLocalDb();
-    cache = db.users;
+    cache = await getMergedUsers();
     return cache;
   }
 
@@ -51,4 +50,12 @@ export function displayName(user) {
   if (typeof u.email === 'string' && u.email.trim()) return u.email.trim();
   if (u.id != null) return `#${u.id}`;
   return '—';
+}
+
+/** @returns {{ id: unknown, label: string }[]} */
+export function listAssignableUsers() {
+  if (!cache) return [];
+  return cache
+    .filter((u) => u && typeof u === 'object')
+    .map((u) => ({ id: /** @type {{ id?: unknown }} */ (u).id, label: displayName(u) }));
 }

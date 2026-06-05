@@ -13,19 +13,19 @@ function toDate(value) {
 /** @param {string | number | Date | null | undefined} value */
 export function formatDate(value) {
   const d = toDate(value);
-  return d ? dateFormatter.format(d) : '—';
+  return d ? dateFormatter.format(d) : '-';
 }
 
 /** @param {string | number | Date | null | undefined} value */
 export function formatDateTime(value) {
   const d = toDate(value);
-  return d ? dateTimeFormatter.format(d) : '—';
+  return d ? dateTimeFormatter.format(d) : '-';
 }
 
 /** @param {string | number | Date | null | undefined} value */
 export function formatRelative(value) {
   const d = toDate(value);
-  if (!d) return '—';
+  if (!d) return '-';
 
   const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
   const diffSec = Math.round((d.getTime() - Date.now()) / 1000);

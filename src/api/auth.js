@@ -1,11 +1,11 @@
 import * as storage from '../utils/storage.js';
 import { clearUsersCache } from './users.js';
-import { loadLocalDb } from './localDb.js';
+import { getMergedUsers, registerUser } from './localPersist.js';
 import { useRemoteApi } from './mode.js';
 import { get, post } from './client.js';
 
-/** Same demo password as `server.cjs` (local JSON mode). */
-const LOCAL_DEMO_PASSWORD = 'password';
+/** Default password for seed users in `db.json` who have no `password` field. */
+const LOCAL_SEED_PASSWORD = 'password';
 
 /** Optional overrides: `window.DESKHUB_LOGIN_PATH`, etc. */
 const LOGIN_PATH = globalThis.DESKHUB_LOGIN_PATH ?? '/auth/login';
@@ -41,28 +41,46 @@ function pickUser(data) {
   return null;
 }
 
+function stripPassword(user) {
+  if (!user || typeof user !== 'object') return {};
+  const u = /** @type {Record<string, unknown>} */ (user);
+  return { id: u.id, name: u.name ?? '', email: u.email ?? '' };
+}
+
+/**
+ * @param {{ name: string, email: string, password: string }} fields
+ */
+export async function signup({ name, email, password }) {
+  if (useRemoteApi()) {
+    throw new Error('Sign up is only set up for local (browser) mode in this demo.');
+  }
+  await registerUser({ name, email, password });
+  clearUsersCache();
+}
+
 /**
  * @param {{ email: string, password: string }} credentials
  */
 export async function login({ email, password }) {
   if (!useRemoteApi()) {
-    const db = await loadLocalDb();
     const normalized = String(email).trim().toLowerCase();
-    const user = db.users.find(
+    const merged = await getMergedUsers();
+    const user = merged.find(
       (u) => u && typeof u === 'object' && String(/** @type {{ email?: unknown }} */ (u).email).toLowerCase() === normalized,
     );
 
-    if (!user || password !== LOCAL_DEMO_PASSWORD) {
-      throw new Error('Invalid email or password');
+    const u = /** @type {Record<string, unknown>} */ (user ?? {});
+    const expected =
+      typeof u.password === 'string' && u.password.length > 0 ? u.password : LOCAL_SEED_PASSWORD;
+
+    if (!user || password !== expected) {
+      throw new Error('Invalid email or password.');
     }
 
-    const u = /** @type {{ id: unknown; name?: unknown; email?: unknown }} */ (user);
     const token = `demo-${u.id}`;
-    const safeUser = { id: u.id, name: u.name ?? '', email: u.email ?? '' };
-
     storage.set('token', token);
-    storage.set('user', JSON.stringify(safeUser));
-    return { token, user: safeUser };
+    storage.set('user', JSON.stringify(stripPassword(user)));
+    return { token, user: stripPassword(user) };
   }
 
   const data = await post(LOGIN_PATH, { email, password });
@@ -108,6 +126,7 @@ export async function logout() {
       // still clear local session
     }
   }
-  storage.clear();
+  storage.remove('token');
+  storage.remove('user');
   clearUsersCache();
 }

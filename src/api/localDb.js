@@ -1,6 +1,6 @@
 /**
- * Loads `db.json` from the static site (no separate API process).
- * Resolved URL is relative to this module: repo root `/db.json`.
+ * Loads `db.json` from the same origin as the page (no separate API process).
+ * Uses `location.href` so paths work from `/index.html`, `/public/tickets.html`, etc.
  */
 
 /** @type {{ users: unknown[]; tickets: unknown[]; comments: unknown[] } | null} */
@@ -9,16 +9,38 @@ let cache = null;
 /** @type {Promise<{ users: unknown[]; tickets: unknown[]; comments: unknown[] }> | null} */
 let inflight = null;
 
+const FETCH_MS = 12000;
+
+/** Resolve db.json URL for static hosting (root vs /public/, GitHub Pages project site, etc.). */
+export function resolveDbJsonUrl() {
+  if (typeof globalThis.DESKHUB_DB_JSON_URL === 'string' && globalThis.DESKHUB_DB_JSON_URL.trim()) {
+    return globalThis.DESKHUB_DB_JSON_URL.trim();
+  }
+  if (typeof location !== 'undefined' && location.href) {
+    if (location.pathname.includes('/public/')) {
+      return new URL('../db.json', location.href).href;
+    }
+    return new URL('db.json', location.href).href;
+  }
+  return new URL('../../db.json', import.meta.url).href;
+}
+
 export async function loadLocalDb() {
   if (cache) {
     return cache;
   }
   if (!inflight) {
-    const url = new URL('../../db.json', import.meta.url);
-    inflight = fetch(url)
+    const url = resolveDbJsonUrl();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_MS);
+
+    inflight = fetch(url, { signal: controller.signal })
       .then(async (res) => {
+        clearTimeout(timeoutId);
         if (!res.ok) {
-          throw new Error(`Could not load db.json (${res.status}). Is the file next to index.html on the server?`);
+          throw new Error(
+            `Could not load db.json (${res.status}) from ${url}. Serve the repo root so db.json is reachable, or set window.DESKHUB_DB_JSON_URL.`,
+          );
         }
         return res.json();
       })
@@ -32,7 +54,11 @@ export async function loadLocalDb() {
         return cache;
       })
       .catch((err) => {
+        clearTimeout(timeoutId);
         inflight = null;
+        if (err && err.name === 'AbortError') {
+          throw new Error(`Loading db.json timed out after ${FETCH_MS}ms (${url}).`);
+        }
         throw err;
       });
   }

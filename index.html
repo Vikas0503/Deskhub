@@ -7,46 +7,55 @@
   <link rel="stylesheet" href="./styles/main.css" />
 </head>
 <body data-page="login">
-  <main class="page">
-    <header class="page__header">
-      <h1 class="page__title">Deskhub</h1>
-      <p class="page__lede">Sign in to continue</p>
+  <div class="app-shell app-shell--center">
+    <header class="app-bar app-bar--minimal" role="banner">
+      <span class="app-bar__brand">Deskhub</span>
     </header>
+    <main class="app-shell__main page page--auth">
+      <header class="page__header">
+        <h1 class="page__title">Welcome back</h1>
+        <p class="page__lede">Sign in to continue</p>
+      </header>
 
-    <section class="panel" aria-labelledby="login-heading">
-      <h2 id="login-heading" class="panel__title">Log in</h2>
+      <section class="panel" aria-labelledby="login-heading">
+        <h2 id="login-heading" class="panel__title">Log in</h2>
 
-      <form id="login-form" class="form" novalidate>
-        <span id="login-error" class="form__error" role="alert" aria-live="polite" hidden></span>
+        <form id="login-form" class="form" novalidate>
+          <span id="login-error" class="form__error" role="alert" aria-live="polite" hidden></span>
 
-        <div class="form__field">
-          <label for="email">Email</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            autocomplete="username"
-            required
-            placeholder="you@example.com"
-          />
-        </div>
+          <div class="form__field">
+            <label for="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              autocomplete="username"
+              required
+              placeholder="you@example.com"
+            />
+          </div>
 
-        <div class="form__field">
-          <label for="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            autocomplete="current-password"
-            required
-            placeholder="••••••••"
-          />
-        </div>
+          <div class="form__field">
+            <label for="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              autocomplete="current-password"
+              required
+              placeholder="••••••••"
+            />
+          </div>
 
-        <button type="submit" class="form__submit">Sign in</button>
-      </form>
-    </section>
-  </main>
+          <button type="submit" class="form__submit">Sign in</button>
+        </form>
+
+        <p class="panel__footer">
+          New here? <a href="./signup.html">Create an account</a>
+        </p>
+      </section>
+    </main>
+  </div>
 
   <script type="module" src="./src/main.js"></script>
 </body>

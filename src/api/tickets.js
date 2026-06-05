@@ -1,5 +1,5 @@
 import { get, post, patch, request } from './client.js';
-import { loadLocalDb } from './localDb.js';
+import * as persist from './localPersist.js';
 import { useRemoteApi } from './mode.js';
 
 /**
@@ -8,8 +8,7 @@ import { useRemoteApi } from './mode.js';
  */
 export async function listTickets(query) {
   if (!useRemoteApi()) {
-    const db = await loadLocalDb();
-    let list = db.tickets.map((t) => t);
+    let list = await persist.getTickets();
     if (query && Object.keys(query).length > 0) {
       const q = query.q ?? query.title_like;
       if (typeof q === 'string' && q.trim()) {
@@ -37,9 +36,9 @@ export async function listTickets(query) {
 /** @param {string | number} id */
 export async function getTicket(id) {
   if (!useRemoteApi()) {
-    const db = await loadLocalDb();
+    const tickets = await persist.getTickets();
     const n = Number(id);
-    const t = db.tickets.find((x) => x && typeof x === 'object' && Number(/** @type {{ id?: unknown }} */ (x).id) === n);
+    const t = tickets.find((x) => x && typeof x === 'object' && Number(/** @type {{ id?: unknown }} */ (x).id) === n);
     if (!t) {
       throw new Error('Ticket not found');
     }
@@ -51,7 +50,20 @@ export async function getTicket(id) {
 /** @param {unknown} body */
 export async function createTicket(body) {
   if (!useRemoteApi()) {
-    throw new Error('Local mode is read-only for writes. Set window.DESKHUB_USE_REMOTE_API = true and run the API.');
+    const tickets = await persist.getTickets();
+    const ids = tickets.map((t) => Number(/** @type {{ id?: unknown }} */ (t).id)).filter(Number.isFinite);
+    const nextId = (ids.length ? Math.max(...ids) : 0) + 1;
+    const now = new Date().toISOString();
+    const b = body && typeof body === 'object' ? /** @type {Record<string, unknown>} */ (body) : {};
+    const newTicket = {
+      ...b,
+      id: nextId,
+      createdAt: b.createdAt ?? now,
+      updatedAt: b.updatedAt ?? now,
+    };
+    tickets.push(newTicket);
+    persist.persistTickets(tickets);
+    return newTicket;
   }
   return post('/tickets', body);
 }
@@ -62,7 +74,20 @@ export async function createTicket(body) {
  */
 export async function updateTicket(id, body) {
   if (!useRemoteApi()) {
-    throw new Error('Local mode is read-only for writes. Set window.DESKHUB_USE_REMOTE_API = true and run the API.');
+    const tickets = await persist.getTickets();
+    const n = Number(id);
+    const idx = tickets.findIndex((x) => x && typeof x === 'object' && Number(/** @type {{ id?: unknown }} */ (x).id) === n);
+    if (idx === -1) throw new Error('Ticket not found');
+    const cur = /** @type {Record<string, unknown>} */ (tickets[idx]);
+    const patchObj = body && typeof body === 'object' ? /** @type {Record<string, unknown>} */ (body) : {};
+    tickets[idx] = {
+      ...cur,
+      ...patchObj,
+      id: cur.id,
+      updatedAt: new Date().toISOString(),
+    };
+    persist.persistTickets(tickets);
+    return tickets[idx];
   }
   return patch(`/tickets/${id}`, body);
 }
@@ -70,7 +95,16 @@ export async function updateTicket(id, body) {
 /** @param {string | number} id */
 export async function deleteTicket(id) {
   if (!useRemoteApi()) {
-    throw new Error('Local mode is read-only for writes. Set window.DESKHUB_USE_REMOTE_API = true and run the API.');
+    const n = Number(id);
+    const tickets = (await persist.getTickets()).filter(
+      (x) => !(x && typeof x === 'object' && Number(/** @type {{ id?: unknown }} */ (x).id) === n),
+    );
+    const comments = (await persist.getComments()).filter(
+      (c) => !(c && typeof c === 'object' && Number(/** @type {{ ticketId?: unknown }} */ (c).ticketId) === n),
+    );
+    persist.persistTickets(tickets);
+    persist.persistComments(comments);
+    return null;
   }
   return request('DELETE', `/tickets/${id}`);
 }
@@ -78,11 +112,13 @@ export async function deleteTicket(id) {
 /** @param {string | number} ticketId */
 export async function listComments(ticketId) {
   if (!useRemoteApi()) {
-    const db = await loadLocalDb();
-    const tid = String(ticketId);
-    return db.comments.filter(
-      (c) => c && typeof c === 'object' && String(/** @type {{ ticketId?: unknown }} */ (c).ticketId) === tid,
-    );
+    const want = String(ticketId);
+    const all = await persist.getComments();
+    return all.filter((c) => {
+      if (!c || typeof c !== 'object') return false;
+      const raw = /** @type {{ ticketId?: unknown }} */ (c).ticketId;
+      return String(raw) === want;
+    });
   }
   return get(`/comments?ticketId=${encodeURIComponent(String(ticketId))}`);
 }
@@ -90,7 +126,21 @@ export async function listComments(ticketId) {
 /** @param {unknown} body */
 export async function addComment(body) {
   if (!useRemoteApi()) {
-    throw new Error('Local mode is read-only for writes. Set window.DESKHUB_USE_REMOTE_API = true and run the API.');
+    const b = body && typeof body === 'object' ? /** @type {Record<string, unknown>} */ (body) : {};
+    const ticketId = b.ticketId;
+    if (ticketId == null) throw new Error('ticketId is required');
+    const comments = await persist.getComments();
+    const ids = comments.map((c) => Number(/** @type {{ id?: unknown }} */ (c).id)).filter(Number.isFinite);
+    const nextId = (ids.length ? Math.max(...ids) : 0) + 1;
+    const row = {
+      ...b,
+      id: nextId,
+      ticketId: Number(ticketId),
+      createdAt: b.createdAt ?? new Date().toISOString(),
+    };
+    comments.push(row);
+    persist.persistComments(comments);
+    return row;
   }
   return post('/comments', body);
 }
