@@ -8,11 +8,11 @@
 </head>
 <body data-page="ticket-detail">
   <div class="app-shell">
-    <header class="app-bar" role="banner">
+    <header class="app-bar app-bar--detail" role="banner">
+      <a href="./tickets.html" class="app-bar__nav-link app-bar__back">← Tickets</a>
       <span class="app-bar__brand">Deskhub</span>
-      <nav class="app-bar__nav" aria-label="Primary">
-        <a href="./tickets.html">← Tickets</a>
-        <a href="../dashboard.html">Dashboard</a>
+      <nav class="app-bar__nav-end" aria-label="Primary">
+        <a href="../dashboard.html" class="app-bar__nav-link">Dashboard</a>
       </nav>
     </header>
 
@@ -58,15 +58,19 @@
           <p id="detail-comments-empty" class="empty-state empty-state--tight" hidden>No comments yet.</p>
           <div id="detail-comments" class="detail-comments__list"></div>
 
-          <form id="comment-form" class="form form--inline-comment">
+          <div class="form form--inline-comment">
             <span id="comment-error" class="form__error" role="alert" hidden></span>
             <div class="form__field">
               <label for="comment-body">Add a comment</label>
               <textarea id="comment-body" name="body" rows="3" placeholder="Write an update…"></textarea>
             </div>
-            <button type="submit" class="form__submit form__submit--narrow">Post comment</button>
-          </form>
+          </div>
         </section>
+
+        <div class="detail-save-bar">
+          <p id="detail-save-error" class="detail-inline-error" role="alert" hidden></p>
+          <button type="button" id="detail-save-btn" class="btn btn--primary" disabled>Save changes</button>
+        </div>
       </article>
     </main>
   </div>

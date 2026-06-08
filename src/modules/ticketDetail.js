@@ -1,3 +1,8 @@
+/**
+ * Ticket detail page: shows one ticket, its comments, and lets you edit
+ * status / priority / assignee plus an optional new comment. Nothing is sent
+ * to the server until you click **Save changes**.
+ */
 import * as auth from '../api/auth.js';
 import * as ticketsApi from '../api/tickets.js';
 import { ensureUsersLoaded, displayName, getUserById, listAssignableUsers } from '../api/users.js';
@@ -20,9 +25,7 @@ const PRIORITY_LABELS = /** @type {Record<string, string>} */ ({
   urgent: 'Urgent',
 });
 
-/**
- * @param {HTMLSelectElement} sel
- */
+/** @param {HTMLSelectElement} sel */
 function resetStatusSelectOptions(sel) {
   sel.replaceChildren();
   for (const v of STATUS_VALUES) {
@@ -35,6 +38,7 @@ function resetStatusSelectOptions(sel) {
 
 /**
  * @param {HTMLSelectElement} sel
+ * @param {string[]} allowed
  * @param {string} current
  */
 function syncSelectToValue(sel, allowed, current) {
@@ -52,9 +56,7 @@ function syncSelectToValue(sel, allowed, current) {
   }
 }
 
-/**
- * @param {HTMLSelectElement} sel
- */
+/** @param {HTMLSelectElement} sel */
 function resetPrioritySelectOptions(sel) {
   sel.replaceChildren();
   for (const v of PRIORITY_VALUES) {
@@ -65,15 +67,13 @@ function resetPrioritySelectOptions(sel) {
   }
 }
 
-/**
- * @param {HTMLSelectElement} sel
- */
+/** @param {HTMLSelectElement} sel */
 function fillAssigneeDetailSelect(sel) {
   sel.replaceChildren();
-  const o0 = document.createElement('option');
-  o0.value = '';
-  o0.textContent = '— Unassigned —';
-  sel.appendChild(o0);
+  const unassigned = document.createElement('option');
+  unassigned.value = '';
+  unassigned.textContent = '— Unassigned —';
+  sel.appendChild(unassigned);
   for (const u of listAssignableUsers()) {
     const opt = document.createElement('option');
     opt.value = String(u.id);
@@ -91,26 +91,28 @@ function setText(id, text) {
 function commentAuthorName(c) {
   if (!c || typeof c !== 'object') return '—';
   const o = /** @type {Record<string, unknown>} */ (c);
-  const aid = o.authorId;
-  return displayName(getUserById(aid));
+  return displayName(getUserById(o.authorId));
+}
+
+/** Oldest first for a simple conversation thread. */
+function compareCommentsOldestFirst(a, b) {
+  const ta = a && typeof a === 'object' ? /** @type {{ createdAt?: unknown }} */ (a).createdAt : null;
+  const tb = b && typeof b === 'object' ? /** @type {{ createdAt?: unknown }} */ (b).createdAt : null;
+  if (typeof ta === 'string' && typeof tb === 'string') return ta.localeCompare(tb);
+  const ia = a && typeof a === 'object' ? Number(/** @type {{ id?: unknown }} */ (a).id) : 0;
+  const ib = b && typeof b === 'object' ? Number(/** @type {{ id?: unknown }} */ (b).id) : 0;
+  return ia - ib;
 }
 
 /**
- * @param {unknown[]} comments
+ * @param {unknown[]} list
  * @param {HTMLElement | null} container
  * @param {HTMLElement | null} emptyEl
  */
 function renderComments(list, container, emptyEl) {
   if (!container) return;
   container.replaceChildren();
-  const sorted = [...list].sort((a, b) => {
-    const ta = a && typeof a === 'object' ? /** @type {{ createdAt?: unknown, id?: unknown }} */ (a).createdAt : null;
-    const tb = b && typeof b === 'object' ? /** @type {{ createdAt?: unknown, id?: unknown }} */ (b).createdAt : null;
-    if (typeof ta === 'string' && typeof tb === 'string') return ta.localeCompare(tb);
-    const ia = a && typeof a === 'object' ? Number(/** @type {{ id?: unknown }} */ (a).id) : 0;
-    const ib = b && typeof b === 'object' ? Number(/** @type {{ id?: unknown }} */ (b).id) : 0;
-    return ia - ib;
-  });
+  const sorted = [...list].sort(compareCommentsOldestFirst);
 
   if (emptyEl) {
     emptyEl.hidden = sorted.length > 0;
@@ -148,6 +150,30 @@ function showError(el, msg) {
   el.hidden = false;
 }
 
+/**
+ * @param {{ status: string; priority: string; assigneeKey: string }} saved
+ * @param {HTMLSelectElement} statusSelect
+ * @param {HTMLSelectElement} prioritySelect
+ * @param {HTMLSelectElement} assigneeSelect
+ * @returns {Record<string, unknown>}
+ */
+function buildTicketPatch(saved, statusSelect, prioritySelect, assigneeSelect) {
+  /** @type {Record<string, unknown>} */
+  const patch = {};
+  if (statusSelect.value !== saved.status) patch.status = statusSelect.value;
+  if (prioritySelect.value !== saved.priority) patch.priority = prioritySelect.value;
+  if (assigneeSelect.value !== saved.assigneeKey) {
+    patch.assigneeId = assigneeSelect.value === '' ? null : Number(assigneeSelect.value);
+  }
+  return patch;
+}
+
+function currentUserAuthorId() {
+  const me = auth.getCurrentUser();
+  if (!me || typeof me !== 'object') return null;
+  return /** @type {{ id?: unknown }} */ (me).id ?? null;
+}
+
 export function initTicketDetailPage() {
   if (!auth.isAuthenticated()) {
     window.location.replace('../index.html');
@@ -156,10 +182,10 @@ export function initTicketDetailPage() {
 
   const params = new URLSearchParams(window.location.search);
   const idRaw = params.get('id');
-  const id = idRaw != null && idRaw !== '' ? idRaw : null;
+  const ticketId = idRaw != null && idRaw !== '' ? idRaw : null;
 
   const errorEl = document.getElementById('detail-error');
-  const form = /** @type {HTMLFormElement | null} */ (document.querySelector('form#comment-form'));
+  const commentBodyEl = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('comment-body'));
   const commentsEl = document.getElementById('detail-comments');
   const commentsEmptyEl = document.getElementById('detail-comments-empty');
   const commentError = document.getElementById('comment-error');
@@ -169,9 +195,32 @@ export function initTicketDetailPage() {
   const priorityError = document.getElementById('detail-priority-error');
   const assigneeSelect = /** @type {HTMLSelectElement | null} */ (document.getElementById('detail-assignee-select'));
   const assigneeError = document.getElementById('detail-assignee-error');
+  const saveBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('detail-save-btn'));
+  const saveError = document.getElementById('detail-save-error');
   const deleteBtn = document.getElementById('detail-delete-btn');
 
-  if (!id) {
+  /** Values last loaded from (or saved to) the server — used to detect unsaved edits. */
+  /** @type {{ status: string; priority: string; assigneeKey: string } | null} */
+  let lastSavedFields = null;
+
+  /** True while we are filling the form from the server (ignore stray “change” events). */
+  let loadingFromServer = false;
+
+  function updateSaveButton() {
+    if (!saveBtn || !statusSelect || !prioritySelect || !assigneeSelect || !lastSavedFields) {
+      if (saveBtn) saveBtn.disabled = true;
+      return;
+    }
+    const ticketChanged =
+      statusSelect.value !== lastSavedFields.status ||
+      prioritySelect.value !== lastSavedFields.priority ||
+      assigneeSelect.value !== lastSavedFields.assigneeKey;
+    const hasNewComment = (commentBodyEl?.value?.trim() ?? '') !== '';
+    const hasSomethingToSave = ticketChanged || hasNewComment;
+    saveBtn.disabled = !hasSomethingToSave || loadingFromServer;
+  }
+
+  if (!ticketId) {
     if (errorEl) {
       errorEl.hidden = false;
       errorEl.textContent = 'Missing ticket id.';
@@ -179,9 +228,39 @@ export function initTicketDetailPage() {
     return;
   }
 
-  let applyingFromServer = false;
+  /**
+   * @param {Record<string, unknown>} ticket
+   */
+  function fillFormFromTicket(ticket) {
+    if (statusSelect) {
+      resetStatusSelectOptions(statusSelect);
+      syncSelectToValue(statusSelect, STATUS_VALUES, typeof ticket.status === 'string' ? ticket.status : '');
+    }
+    if (prioritySelect) {
+      resetPrioritySelectOptions(prioritySelect);
+      syncSelectToValue(
+        prioritySelect,
+        PRIORITY_VALUES,
+        typeof ticket.priority === 'string' ? ticket.priority : 'medium',
+      );
+    }
+    if (assigneeSelect) {
+      fillAssigneeDetailSelect(assigneeSelect);
+      const aid = ticket.assigneeId;
+      const key = aid != null && aid !== '' ? String(aid) : '';
+      const optionExists = key && [...assigneeSelect.options].some((o) => o.value === key);
+      assigneeSelect.value = optionExists ? key : '';
+    }
 
-  async function load() {
+    lastSavedFields = {
+      status: statusSelect?.value ?? '',
+      priority: prioritySelect?.value ?? '',
+      assigneeKey: assigneeSelect?.value ?? '',
+    };
+    updateSaveButton();
+  }
+
+  async function loadTicketPage() {
     if (errorEl) {
       errorEl.hidden = true;
       errorEl.textContent = '';
@@ -189,11 +268,16 @@ export function initTicketDetailPage() {
     hideError(statusError);
     hideError(priorityError);
     hideError(assigneeError);
-    applyingFromServer = true;
+    hideError(saveError);
+    hideError(commentError);
+    loadingFromServer = true;
     showPageLoader('Loading ticket…');
     try {
       await ensureUsersLoaded();
-      const [ticket, comments] = await Promise.all([ticketsApi.getTicket(id), ticketsApi.listComments(id)]);
+      const [ticket, comments] = await Promise.all([
+        ticketsApi.getTicket(ticketId),
+        ticketsApi.listComments(ticketId),
+      ]);
 
       if (!ticket || typeof ticket !== 'object') throw new Error('Invalid ticket');
       const t = /** @type {Record<string, unknown>} */ (ticket);
@@ -203,64 +287,76 @@ export function initTicketDetailPage() {
       setText('detail-customer', typeof t.customer === 'string' ? t.customer : '—');
       setText('detail-created', formatDateTime(t.createdAt ?? t.created ?? null));
 
-      if (statusSelect) {
-        resetStatusSelectOptions(statusSelect);
-        syncSelectToValue(statusSelect, STATUS_VALUES, typeof t.status === 'string' ? t.status : '');
-      }
-      if (prioritySelect) {
-        resetPrioritySelectOptions(prioritySelect);
-        syncSelectToValue(prioritySelect, PRIORITY_VALUES, typeof t.priority === 'string' ? t.priority : 'medium');
-      }
-      if (assigneeSelect) {
-        fillAssigneeDetailSelect(assigneeSelect);
-        const aid = t.assigneeId;
-        const key = aid != null && aid !== '' ? String(aid) : '';
-        const has = key && [...assigneeSelect.options].some((o) => o.value === key);
-        assigneeSelect.value = has ? key : '';
-      }
+      fillFormFromTicket(t);
+
+      if (commentBodyEl) commentBodyEl.value = '';
 
       renderComments(Array.isArray(comments) ? comments : [], commentsEl, commentsEmptyEl);
     } catch (err) {
+      lastSavedFields = null;
       if (errorEl) {
         errorEl.hidden = false;
         errorEl.textContent = err instanceof Error ? err.message : 'Could not load ticket.';
       }
     } finally {
-      applyingFromServer = false;
+      loadingFromServer = false;
       hidePageLoader();
+      updateSaveButton();
     }
   }
 
-  async function patchField(patch, label, errorEl) {
-    hideError(errorEl);
+  function onUserEdit() {
+    if (loadingFromServer) return;
+    updateSaveButton();
+  }
+
+  statusSelect?.addEventListener('change', onUserEdit);
+  prioritySelect?.addEventListener('change', onUserEdit);
+  assigneeSelect?.addEventListener('change', onUserEdit);
+  commentBodyEl?.addEventListener('input', onUserEdit);
+
+  saveBtn?.addEventListener('click', async () => {
+    if (!saveBtn || !statusSelect || !prioritySelect || !assigneeSelect || !lastSavedFields) return;
+
+    hideError(saveError);
+    hideError(statusError);
+    hideError(priorityError);
+    hideError(assigneeError);
+    hideError(commentError);
+
+    const patch = buildTicketPatch(lastSavedFields, statusSelect, prioritySelect, assigneeSelect);
+    const newCommentText = commentBodyEl?.value?.trim() ?? '';
+
+    if (Object.keys(patch).length === 0 && !newCommentText) {
+      return;
+    }
+
+    if (newCommentText && currentUserAuthorId() == null) {
+      showError(commentError, 'Not signed in.');
+      return;
+    }
+
+    saveBtn.disabled = true;
     try {
-      await ticketsApi.updateTicket(id, patch);
-      showToast(`${label} updated`, { variant: 'success' });
-      await load();
+      if (Object.keys(patch).length > 0) {
+        await ticketsApi.updateTicket(ticketId, patch);
+      }
+      if (newCommentText) {
+        const authorId = currentUserAuthorId();
+        await ticketsApi.addComment({
+          ticketId: Number(ticketId) || ticketId,
+          authorId,
+          body: newCommentText,
+        });
+      }
+      showToast('Saved', { variant: 'success' });
+      await loadTicketPage();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Update failed.';
-      showError(errorEl, msg);
+      const msg = err instanceof Error ? err.message : 'Save failed.';
+      showError(saveError, msg);
       showToast(msg, { variant: 'error' });
-      await load();
+      updateSaveButton();
     }
-  }
-
-  statusSelect?.addEventListener('change', () => {
-    if (!statusSelect || applyingFromServer) return;
-    void patchField({ status: statusSelect.value }, 'Status', statusError);
-  });
-
-  prioritySelect?.addEventListener('change', () => {
-    if (!prioritySelect || applyingFromServer) return;
-    void patchField({ priority: prioritySelect.value }, 'Priority', priorityError);
-  });
-
-  assigneeSelect?.addEventListener('change', () => {
-    if (!assigneeSelect || applyingFromServer) return;
-    const raw = assigneeSelect.value;
-    const patch =
-      raw === '' ? { assigneeId: null } : { assigneeId: Number(raw) };
-    void patchField(patch, 'Assignee', assigneeError);
   });
 
   deleteBtn?.addEventListener('click', async () => {
@@ -272,7 +368,7 @@ export function initTicketDetailPage() {
     });
     if (!ok) return;
     try {
-      await ticketsApi.deleteTicket(id);
+      await ticketsApi.deleteTicket(ticketId);
       showToast('Ticket deleted', { variant: 'success' });
       window.setTimeout(() => {
         window.location.assign('./tickets.html');
@@ -282,48 +378,5 @@ export function initTicketDetailPage() {
     }
   });
 
-  form?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (commentError) {
-      commentError.textContent = '';
-      commentError.hidden = true;
-    }
-    const ta = /** @type {HTMLTextAreaElement | null} */ (form.querySelector('#comment-body'));
-    const body = ta?.value?.trim() ?? '';
-    if (!body) {
-      if (commentError) {
-        commentError.textContent = 'Write a comment first.';
-        commentError.hidden = false;
-      }
-      return;
-    }
-    const me = auth.getCurrentUser();
-    const authorId = me && typeof me === 'object' ? /** @type {{ id?: unknown }} */ (me).id : null;
-    if (authorId == null) {
-      if (commentError) {
-        commentError.textContent = 'Not signed in.';
-        commentError.hidden = false;
-      }
-      return;
-    }
-    try {
-      await ticketsApi.addComment({
-        ticketId: Number(id) || id,
-        authorId,
-        body,
-      });
-      ta.value = '';
-      showToast('Comment added', { variant: 'success' });
-      await load();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to add comment.';
-      if (commentError) {
-        commentError.textContent = msg;
-        commentError.hidden = false;
-      }
-      showToast(msg, { variant: 'error' });
-    }
-  });
-
-  void load();
+  void loadTicketPage();
 }

@@ -12,6 +12,11 @@ import { formatDateTime, formatRelative } from '../utils/formatDate.js';
 import { attachFormValidation } from './form.js';
 import { showToast } from './ui.js';
 
+/**
+ * Tickets list page: filters, table, pagination, new-ticket modal.
+ * `state` holds the current list query; the URL (?status=, ?q=, …) stays in sync via `syncUrl()`.
+ */
+
 /** @type {import('../utils/ticketQuery.js').TicketListState} */
 const state = {
   q: '',
@@ -186,6 +191,30 @@ function applyParsedUrl(next) {
 }
 
 /**
+ * Search + status + priority + sort — safe before assignee options are built.
+ * @param {{ searchInput: HTMLInputElement; filterSelect: HTMLSelectElement; prioritySelect: HTMLSelectElement; sortSelect: HTMLSelectElement }} ui
+ */
+function mirrorTextFiltersFromState(ui) {
+  ui.searchInput.value = state.q;
+  ui.filterSelect.value = state.status;
+  ui.prioritySelect.value = state.priority;
+  ui.sortSelect.value = state.sort;
+}
+
+/**
+ * All toolbar fields, including assignee (call after `fillAssigneeSelect`).
+ * @param {{ searchInput: HTMLInputElement; filterSelect: HTMLSelectElement; prioritySelect: HTMLSelectElement; sortSelect: HTMLSelectElement; toolbarAssigneeSelect: HTMLSelectElement | null }} ui
+ */
+function mirrorFullToolbarFromState(ui) {
+  mirrorTextFiltersFromState(ui);
+  const assigneeSel = ui.toolbarAssigneeSelect;
+  if (!assigneeSel) return;
+  const hasOption = [...assigneeSel.options].some((o) => o.value === state.assigneeId);
+  assigneeSel.value = hasOption ? state.assigneeId : '';
+  if (!hasOption) state.assigneeId = '';
+}
+
+/**
  * @param {{
  *   errorWrap: HTMLElement;
  *   errorMsg: HTMLElement;
@@ -207,8 +236,6 @@ function applyParsedUrl(next) {
  * }} ui
  */
 export async function refresh(ui) {
-  readStateFromDom(ui);
-
   const {
     errorWrap,
     errorMsg,
@@ -228,6 +255,13 @@ export async function refresh(ui) {
     pageNumbers,
   } = ui;
 
+  // Deep links from the dashboard: `state` already matches the URL, but the
+  // HTML selects still show their defaults. Copy `state` into the DOM *before*
+  // readStateFromDom(), or it would overwrite `state` with those defaults.
+  mirrorTextFiltersFromState(ui);
+
+  readStateFromDom(ui);
+
   errorWrap.hidden = true;
   loadingEl.hidden = false;
   emptyEl.hidden = true;
@@ -240,15 +274,7 @@ export async function refresh(ui) {
     fillAssigneeSelect(ui.assigneeSelect, 'modal');
     fillAssigneeSelect(ui.toolbarAssigneeSelect, 'toolbar');
 
-    searchInput.value = state.q;
-    filterSelect.value = state.status;
-    prioritySelect.value = state.priority;
-    sortSelect.value = state.sort;
-    if (toolbarAssigneeSelect) {
-      const hasOpt = [...toolbarAssigneeSelect.options].some((o) => o.value === state.assigneeId);
-      toolbarAssigneeSelect.value = hasOpt ? state.assigneeId : '';
-      if (!hasOpt) state.assigneeId = '';
-    }
+    mirrorFullToolbarFromState(ui);
 
     const data = await ticketsApi.listTickets();
     const allTickets = Array.isArray(data) ? data.map((t) => t) : [];

@@ -1,18 +1,22 @@
+/**
+ * Dashboard: ticket counts (four summary cards) and a short “recent tickets” list.
+ * Uses one `listTickets()` call; each stat is just a filtered count in memory.
+ */
 import * as ticketsApi from '../api/tickets.js';
 import { showPageLoader, hidePageLoader } from './ui.js';
 
-const TICKETS_BASE = './public/tickets.html';
-const DETAIL_BASE = './public/ticket-detail.html';
+const TICKETS_LIST_URL = './public/tickets.html';
+const TICKET_DETAIL_URL = './public/ticket-detail.html';
 
-/** @param {unknown} t */
-function statusLower(t) {
+/** Normalised status string for comparisons. */
+function ticketStatusLower(t) {
   if (!t || typeof t !== 'object') return '';
   const s = /** @type {{ status?: unknown }} */ (t).status;
   return typeof s === 'string' ? s.trim().toLowerCase() : '';
 }
 
-/** @param {unknown} t */
-function createdMs(t) {
+/** Timestamp used to sort “most recent” tickets. */
+function ticketCreatedMs(t) {
   if (!t || typeof t !== 'object') return 0;
   const o = /** @type {Record<string, unknown>} */ (t);
   const raw = o.createdAt ?? o.created;
@@ -21,73 +25,71 @@ function createdMs(t) {
   return Number.isFinite(ms) ? ms : 0;
 }
 
-/**
- * Four “virtual” filtered counts in parallel (Day 32). One list fetch; counts match filter semantics.
- * When wired to a real API with `X-Total-Count`, replace each branch with `GET /tickets?...` + header.
- * @param {unknown[]} tickets
- */
-async function computeDashboardCounts(tickets) {
-  const arr = tickets.filter((t) => t && typeof t === 'object');
-
-  return Promise.all([
-    Promise.resolve(arr.length),
-    Promise.resolve(arr.filter((t) => statusLower(t) === 'open').length),
-    Promise.resolve(
-      arr.filter((t) => {
-        const s = statusLower(t);
-        return s === 'in progress' || s === 'in-progress';
-      }).length,
-    ),
-    Promise.resolve(
-      arr.filter((t) => {
-        const s = statusLower(t);
-        return s === 'resolved' || s === 'closed';
-      }).length,
-    ),
-  ]);
+function countOpen(tickets) {
+  return tickets.filter((t) => ticketStatusLower(t) === 'open').length;
 }
 
-/**
- * @param {unknown[]} tickets
- * @returns {unknown[]}
- */
-function recentFiveTickets(tickets) {
-  const arr = tickets.filter((t) => t && typeof t === 'object');
-  return [...arr].sort((a, b) => createdMs(b) - createdMs(a)).slice(0, 5);
+function countInProgress(tickets) {
+  return tickets.filter((t) => {
+    const s = ticketStatusLower(t);
+    return s === 'in progress' || s === 'in-progress';
+  }).length;
+}
+
+/** “Done” pipeline: resolved or closed (matches the `status=done` filter on the list page). */
+function countResolvedOrClosed(tickets) {
+  return tickets.filter((t) => {
+    const s = ticketStatusLower(t);
+    return s === 'resolved' || s === 'closed';
+  }).length;
+}
+
+/** Newest first, then take five. */
+function fiveMostRecentTickets(tickets) {
+  const objectsOnly = tickets.filter((t) => t && typeof t === 'object');
+  return [...objectsOnly].sort((a, b) => ticketCreatedMs(b) - ticketCreatedMs(a)).slice(0, 5);
 }
 
 /**
  * @param {HTMLElement} listEl
- * @param {number} total
- * @param {number} open
- * @param {number} inProgress
- * @param {number} resolved
+ * @param {{ total: number; open: number; inProgress: number; resolvedOrClosed: number }} counts
  */
-function renderFourStatCards(listEl, total, open, inProgress, resolved) {
+function renderStatCards(listEl, counts) {
   listEl.replaceChildren();
 
-  /** @param {string} href @param {string} value @param {string} label */
-  function addLinkCard(href, value, label) {
+  /** One clickable stat card linking to the filtered ticket list. */
+  function addCard(href, count, label) {
     const li = document.createElement('li');
-    const a = document.createElement('a');
-    a.href = href;
-    a.className = 'stat-card';
-    const val = document.createElement('span');
-    val.className = 'stat-card__value';
-    val.textContent = value;
-    const lab = document.createElement('span');
-    lab.className = 'stat-card__label';
-    lab.textContent = label;
-    a.appendChild(val);
-    a.appendChild(lab);
-    li.appendChild(a);
+    const link = document.createElement('a');
+    link.href = href;
+    link.className = 'stat-card';
+
+    const value = document.createElement('span');
+    value.className = 'stat-card__value';
+    value.textContent = String(count);
+
+    const caption = document.createElement('span');
+    caption.className = 'stat-card__label';
+    caption.textContent = label;
+
+    link.appendChild(value);
+    link.appendChild(caption);
+    li.appendChild(link);
     listEl.appendChild(li);
   }
 
-  addLinkCard(TICKETS_BASE, String(total), 'Total');
-  addLinkCard(`${TICKETS_BASE}?status=${encodeURIComponent('open')}`, String(open), 'Open');
-  addLinkCard(`${TICKETS_BASE}?status=${encodeURIComponent('in progress')}`, String(inProgress), 'In progress');
-  addLinkCard(`${TICKETS_BASE}?status=${encodeURIComponent('done')}`, String(resolved), 'Resolved + closed');
+  addCard(TICKETS_LIST_URL, counts.total, 'Total');
+  addCard(`${TICKETS_LIST_URL}?status=${encodeURIComponent('open')}`, counts.open, 'Open');
+  addCard(
+    `${TICKETS_LIST_URL}?status=${encodeURIComponent('in progress')}`,
+    counts.inProgress,
+    'In progress',
+  );
+  addCard(
+    `${TICKETS_LIST_URL}?status=${encodeURIComponent('done')}`,
+    counts.resolvedOrClosed,
+    'Resolved + closed',
+  );
 }
 
 /**
@@ -98,11 +100,10 @@ function renderFourStatCards(listEl, total, open, inProgress, resolved) {
 function renderRecentTickets(container, emptyEl, tickets) {
   if (!container) return;
   container.replaceChildren();
-  const recent = recentFiveTickets(tickets);
+
+  const recent = fiveMostRecentTickets(tickets);
   if (recent.length === 0) {
-    if (emptyEl) {
-      emptyEl.hidden = false;
-    }
+    if (emptyEl) emptyEl.hidden = false;
     return;
   }
   if (emptyEl) emptyEl.hidden = true;
@@ -115,21 +116,26 @@ function renderRecentTickets(container, emptyEl, tickets) {
     const t = /** @type {Record<string, unknown>} */ (raw);
     const id = t.id != null ? String(t.id) : '';
     const title = typeof t.title === 'string' ? t.title : 'Ticket';
+
     const li = document.createElement('li');
-    const a = document.createElement('a');
-    a.className = 'dashboard-recent__link';
-    a.href = `${DETAIL_BASE}?id=${encodeURIComponent(id)}`;
-    const strong = document.createElement('strong');
-    strong.textContent = id ? `#${id}` : '—';
-    const span = document.createElement('span');
-    span.className = 'dashboard-recent__title';
-    span.textContent = title;
-    a.appendChild(strong);
-    a.appendChild(document.createTextNode(' '));
-    a.appendChild(span);
-    li.appendChild(a);
+    const link = document.createElement('a');
+    link.className = 'dashboard-recent__link';
+    link.href = `${TICKET_DETAIL_URL}?id=${encodeURIComponent(id)}`;
+
+    const idLabel = document.createElement('strong');
+    idLabel.textContent = id ? `#${id}` : '—';
+
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'dashboard-recent__title';
+    titleSpan.textContent = title;
+
+    link.appendChild(idLabel);
+    link.appendChild(document.createTextNode(' '));
+    link.appendChild(titleSpan);
+    li.appendChild(link);
     ul.appendChild(li);
   }
+
   container.appendChild(ul);
 }
 
@@ -155,12 +161,20 @@ export function initDashboard() {
 
   void ticketsApi
     .listTickets()
-    .then(async (data) => {
+    .then((data) => {
       const tickets = Array.isArray(data) ? data : [];
-      const [total, open, inProgress, resolved] = await computeDashboardCounts(tickets);
+      const objectsOnly = tickets.filter((t) => t && typeof t === 'object');
+
+      const counts = {
+        total: objectsOnly.length,
+        open: countOpen(objectsOnly),
+        inProgress: countInProgress(objectsOnly),
+        resolvedOrClosed: countResolvedOrClosed(objectsOnly),
+      };
+
       loadingEl.hidden = true;
       hidePageLoader();
-      renderFourStatCards(listEl, total, open, inProgress, resolved);
+      renderStatCards(listEl, counts);
       listEl.hidden = false;
       renderRecentTickets(recentWrap, recentEmpty, tickets);
     })

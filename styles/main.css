@@ -98,6 +98,8 @@ select {
   justify-content: center;
   padding-top: 1rem;
   padding-bottom: 2rem;
+  max-width: 36rem;
+  width: 100%;
 }
 
 /* Panel + form */
@@ -731,6 +733,30 @@ select {
   align-items: center;
 }
 
+/* Ticket detail: back on the left, brand centered, actions on the right */
+.app-bar--detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.app-bar--detail .app-bar__back {
+  justify-self: start;
+}
+
+.app-bar--detail .app-bar__brand {
+  justify-self: center;
+  text-align: center;
+}
+
+.app-bar--detail .app-bar__nav-end {
+  justify-self: end;
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+}
+
 .app-bar__nav a,
 .app-bar__nav-link {
   color: var(--dh-muted);
@@ -891,14 +917,14 @@ body.modal-open {
   box-shadow: 0 0 0 2px var(--dh-focus);
 }
 
-.detail-save-hint {
-  font-size: 0.8rem;
-  color: #86efac;
-  font-weight: 600;
-}
-
-.detail-save-hint[hidden] {
-  display: none;
+.detail-save-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--dh-border);
 }
 
 .detail-inline-error {
