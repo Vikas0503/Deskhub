@@ -131,7 +131,14 @@ export function applyTicketListQuery(allTickets, state) {
 
   if (state.status) {
     const want = state.status.trim().toLowerCase();
-    list = list.filter((raw) => statusStr(raw) === want);
+    if (want === 'done') {
+      list = list.filter((raw) => {
+        const s = statusStr(raw);
+        return s === 'resolved' || s === 'closed';
+      });
+    } else {
+      list = list.filter((raw) => statusStr(raw) === want);
+    }
   }
 
   if (state.priority) {

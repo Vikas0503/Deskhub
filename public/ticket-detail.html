@@ -20,24 +20,42 @@
       <p id="detail-error" class="tickets-state tickets-state--error" role="alert" hidden></p>
 
       <article class="detail-card" id="detail-card" aria-labelledby="detail-title">
-        <header class="detail-card__head">
-          <p class="detail-card__id" id="detail-id">—</p>
-          <h1 class="detail-card__title" id="detail-title">—</h1>
+        <header class="detail-card__head detail-card__head--row">
+          <div>
+            <p class="detail-card__id" id="detail-id">—</p>
+            <h1 class="detail-card__title" id="detail-title">—</h1>
+          </div>
+          <button type="button" id="detail-delete-btn" class="btn btn--danger">Delete ticket</button>
         </header>
         <dl class="detail-meta">
           <div><dt>Customer</dt><dd id="detail-customer">—</dd></div>
-          <div><dt>Priority</dt><dd id="detail-priority">—</dd></div>
-          <div><dt>Status</dt><dd class="detail-meta__dd--control">
-            <select id="detail-status-select" class="detail-meta__select" aria-label="Ticket status"></select>
-            <span id="detail-status-saved" class="detail-save-hint" hidden>Updated</span>
-            <span id="detail-status-error" class="detail-inline-error" role="alert" hidden></span>
-          </dd></div>
-          <div><dt>Assignee</dt><dd id="detail-assignee">—</dd></div>
+          <div>
+            <dt>Priority</dt>
+            <dd class="detail-meta__dd--control">
+              <select id="detail-priority-select" class="detail-meta__select" aria-label="Ticket priority"></select>
+              <span id="detail-priority-error" class="detail-inline-error" role="alert" hidden></span>
+            </dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd class="detail-meta__dd--control">
+              <select id="detail-status-select" class="detail-meta__select" aria-label="Ticket status"></select>
+              <span id="detail-status-error" class="detail-inline-error" role="alert" hidden></span>
+            </dd>
+          </div>
+          <div>
+            <dt>Assignee</dt>
+            <dd class="detail-meta__dd--control">
+              <select id="detail-assignee-select" class="detail-meta__select" aria-label="Assignee"></select>
+              <span id="detail-assignee-error" class="detail-inline-error" role="alert" hidden></span>
+            </dd>
+          </div>
           <div><dt>Created</dt><dd id="detail-created">—</dd></div>
         </dl>
 
         <section class="detail-comments" aria-labelledby="comments-heading">
           <h2 id="comments-heading" class="detail-comments__title">Comments</h2>
+          <p id="detail-comments-empty" class="empty-state empty-state--tight" hidden>No comments yet.</p>
           <div id="detail-comments" class="detail-comments__list"></div>
 
           <form id="comment-form" class="form form--inline-comment">

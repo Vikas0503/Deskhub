@@ -36,6 +36,7 @@
               <option value="in progress">in progress</option>
               <option value="resolved">resolved</option>
               <option value="closed">closed</option>
+              <option value="done">resolved + closed</option>
             </select>
           </label>
           <label class="tickets-toolbar__item">
@@ -106,17 +107,19 @@
 
   <div id="ticket-modal" class="modal" hidden>
     <div class="modal__backdrop" data-modal-close tabindex="-1" aria-hidden="true"></div>
-    <div class="modal__panel panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal__panel panel" role="dialog" aria-modal="true" aria-labelledby="modal-title" data-modal-panel>
       <h2 id="modal-title" class="panel__title">New ticket</h2>
       <form id="new-ticket-form" class="form">
         <span id="new-ticket-error" class="form__error" role="alert" hidden></span>
         <div class="form__field">
           <label for="nt-title">Title</label>
-          <input type="text" id="nt-title" name="title" required placeholder="Short summary" />
+          <input type="text" id="nt-title" name="title" autocomplete="off" placeholder="Short summary" />
+          <span id="nt-title-error" class="form__field-error" role="alert" hidden></span>
         </div>
         <div class="form__field">
           <label for="nt-customer">Customer</label>
-          <input type="text" id="nt-customer" name="customer" required placeholder="Organization" />
+          <input type="text" id="nt-customer" name="customer" autocomplete="organization" placeholder="Organization" />
+          <span id="nt-customer-error" class="form__field-error" role="alert" hidden></span>
         </div>
         <div class="form__row">
           <div class="form__field">
@@ -127,6 +130,7 @@
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
             </select>
+            <span id="nt-priority-error" class="form__field-error" role="alert" hidden></span>
           </div>
           <div class="form__field">
             <label for="nt-status">Status</label>
@@ -136,6 +140,7 @@
               <option value="resolved">Resolved</option>
               <option value="closed">Closed</option>
             </select>
+            <span id="nt-status-error" class="form__field-error" role="alert" hidden></span>
           </div>
         </div>
         <div class="form__field">
@@ -146,7 +151,7 @@
         </div>
         <div class="modal__actions">
           <button type="button" class="btn btn--secondary" data-modal-close>Cancel</button>
-          <button type="submit" class="btn btn--primary">Create</button>
+          <button type="submit" id="nt-submit" class="btn btn--primary">Create</button>
         </div>
       </form>
     </div>

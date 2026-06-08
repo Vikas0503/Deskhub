@@ -9,6 +9,8 @@ import {
   parseTicketListQuery,
 } from '../utils/ticketQuery.js';
 import { formatDateTime, formatRelative } from '../utils/formatDate.js';
+import { attachFormValidation } from './form.js';
+import { showToast } from './ui.js';
 
 /** @type {import('../utils/ticketQuery.js').TicketListState} */
 const state = {
@@ -376,6 +378,54 @@ export function initTicketsList() {
     pageNumbers,
   };
 
+  const titleEl = /** @type {HTMLInputElement | null} */ (newTicketForm?.querySelector('#nt-title'));
+  const customerEl = /** @type {HTMLInputElement | null} */ (newTicketForm?.querySelector('#nt-customer'));
+  const priorityEl = /** @type {HTMLSelectElement | null} */ (newTicketForm?.querySelector('#nt-priority'));
+  const statusEl = /** @type {HTMLSelectElement | null} */ (newTicketForm?.querySelector('#nt-status'));
+  const ntSubmit = document.getElementById('nt-submit');
+
+  /** @type {ReturnType<typeof attachFormValidation> | null} */
+  let newTicketFormCtrl = null;
+  if (
+    newTicketForm &&
+    titleEl &&
+    customerEl &&
+    priorityEl &&
+    statusEl &&
+    ntSubmit instanceof HTMLButtonElement
+  ) {
+    newTicketFormCtrl = attachFormValidation({
+      form: newTicketForm,
+      submitButton: ntSubmit,
+      fields: [
+        {
+          name: 'title',
+          el: titleEl,
+          errorEl: document.getElementById('nt-title-error'),
+          rules: [{ rule: 'required' }, { rule: 'minLength', min: 2 }, { rule: 'maxLength', max: 200 }],
+        },
+        {
+          name: 'customer',
+          el: customerEl,
+          errorEl: document.getElementById('nt-customer-error'),
+          rules: [{ rule: 'required' }, { rule: 'minLength', min: 1 }, { rule: 'maxLength', max: 120 }],
+        },
+        {
+          name: 'priority',
+          el: priorityEl,
+          errorEl: document.getElementById('nt-priority-error'),
+          rules: [{ rule: 'oneOf', values: ['low', 'medium', 'high', 'urgent'] }],
+        },
+        {
+          name: 'status',
+          el: statusEl,
+          errorEl: document.getElementById('nt-status-error'),
+          rules: [{ rule: 'oneOf', values: ['open', 'in progress', 'resolved', 'closed'] }],
+        },
+      ],
+    });
+  }
+
   const runRefresh = () => {
     void refresh(ui);
   };
@@ -430,8 +480,16 @@ export function initTicketsList() {
 
   function openModal() {
     if (!modal) return;
+    newTicketFormCtrl?.clearErrors();
+    if (newTicketError) {
+      newTicketError.hidden = true;
+      newTicketError.textContent = '';
+    }
     modal.hidden = false;
     document.body.classList.add('modal-open');
+    newTicketForm?.reset();
+    fillAssigneeSelect(ui.assigneeSelect, 'modal');
+    newTicketFormCtrl?.updateSubmitDisabled();
   }
 
   function closeModal() {
@@ -445,6 +503,9 @@ export function initTicketsList() {
   }
 
   newTicketOpen?.addEventListener('click', () => openModal());
+  modal?.querySelector('[data-modal-panel]')?.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+  });
   modal?.querySelectorAll('[data-modal-close]').forEach((el) => {
     el.addEventListener('click', () => closeModal());
   });
@@ -459,10 +520,28 @@ export function initTicketsList() {
     newTicketError.hidden = true;
     newTicketError.textContent = '';
 
-    const title = /** @type {HTMLInputElement} */ (newTicketForm.querySelector('#nt-title'))?.value?.trim() ?? '';
-    const customer = /** @type {HTMLInputElement} */ (newTicketForm.querySelector('#nt-customer'))?.value?.trim() ?? '';
-    const priority = /** @type {HTMLSelectElement} */ (newTicketForm.querySelector('#nt-priority'))?.value ?? 'medium';
-    const status = /** @type {HTMLSelectElement} */ (newTicketForm.querySelector('#nt-status'))?.value ?? 'open';
+    if (newTicketFormCtrl && !newTicketFormCtrl.validateAll()) {
+      newTicketError.textContent = 'Fix the highlighted fields and try again.';
+      newTicketError.hidden = false;
+      return;
+    }
+
+    let title;
+    let customer;
+    let priority;
+    let status;
+    if (newTicketFormCtrl) {
+      const v = newTicketFormCtrl.collectValues();
+      title = v.title.trim();
+      customer = v.customer.trim();
+      priority = v.priority;
+      status = v.status;
+    } else {
+      title = /** @type {HTMLInputElement} */ (newTicketForm.querySelector('#nt-title'))?.value?.trim() ?? '';
+      customer = /** @type {HTMLInputElement} */ (newTicketForm.querySelector('#nt-customer'))?.value?.trim() ?? '';
+      priority = /** @type {HTMLSelectElement} */ (newTicketForm.querySelector('#nt-priority'))?.value ?? 'medium';
+      status = /** @type {HTMLSelectElement} */ (newTicketForm.querySelector('#nt-status'))?.value ?? 'open';
+    }
     const assigneeRaw = ui.assigneeSelect?.value ?? '';
 
     if (!title || !customer) {
@@ -482,12 +561,16 @@ export function initTicketsList() {
       await ticketsApi.createTicket(payload);
       newTicketForm.reset();
       fillAssigneeSelect(ui.assigneeSelect, 'modal');
+      newTicketFormCtrl?.clearErrors();
+      newTicketFormCtrl?.updateSubmitDisabled();
       closeModal();
       state.page = 1;
       await refresh(ui);
+      showToast('Ticket created', { variant: 'success' });
     } catch (err) {
       newTicketError.textContent = err instanceof Error ? err.message : 'Could not create ticket.';
       newTicketError.hidden = false;
+      showToast(newTicketError.textContent, { variant: 'error' });
     }
   });
 

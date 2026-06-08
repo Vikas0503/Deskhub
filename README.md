@@ -1,66 +1,105 @@
 # Deskhub
 
-Static front-end: login, `deskhub:` storage keys, and ticket list. **By default everything runs in the browser** using `db.json` served from the same site — **no `npm run api` or port 3001 required.**
+Small static helpdesk UI: **login**, **dashboard** (ticket counts + recent items), **ticket list** with filters and pagination, and **ticket detail** with status/priority/assignee updates, comments, and delete. No bundler: plain ES modules and shared CSS.
 
-## Run the site (default, no API)
+## How to run
 
-Serve the **repo root** so `/index.html`, `/db.json`, `/src/…`, and `/styles/…` are all reachable:
+Serve the **repository root** so these paths work together:
+
+- `/index.html`, `/signup.html`, `/dashboard.html`
+- `/public/tickets.html`, `/public/ticket-detail.html`
+- `/src/…`, `/styles/main.css`, `/db.json`
 
 ```bash
 npm start
 ```
 
-Or use VS Code **Live Server** with the workspace root as this folder.
+Or use any static server (e.g. VS Code Live Server) with the project root as the web root.
 
-Then open **`/`** (login), **`/dashboard.html`**, or **`/public/tickets.html`**.
+Then open **`/`** for login. After sign-in you land on **`/dashboard.html`**.
 
-**Demo login (local mode):** any **`email`** from `db.json` → `users` (e.g. `alice@example.com`) and password **`password`**.
+**Demo login (default, in-browser data):** any **`email`** from `db.json` → `users` (for example `alice@example.com`) and password **`password`**.
 
-Data is loaded with `fetch` from **`db.json`** next to your HTML (URL is derived from the current page; you can set **`window.DESKHUB_DB_JSON_URL`** to override). Ticket writes stay disabled in local mode until you enable the remote API (below).
+You can also **sign up** on `/signup.html`; new users are merged into local storage and appear in assignee pickers.
 
-## Optional: real HTTP API on port 3001
+## Data mode (default vs remote API)
 
-If you want `json-server` + `/auth/*` again:
+### Default: `db.json` in the browser
 
-1. `npm install` (installs `json-server` for `server.cjs`).
-2. `window.DESKHUB_USE_REMOTE_API = true` in a `<script>` **before** `./src/main.js` in your HTML (and usually `window.DESKHUB_API_BASE = 'http://localhost:3001'`).
-3. **`npm run api`** in another terminal.
+The app loads **`db.json`** with `fetch`. The URL is resolved from the current page; override with **`window.DESKHUB_DB_JSON_URL`** if needed.
 
-## Verify the API (remote only)
+In this mode, **tickets and comments are read and written in the browser** (local persistence layer in `src/api/tickets.js` and related modules). You do **not** need `npm run api` for normal local development.
 
-With **`npm run api`** (or any server) on port **3001**:
+### Optional: JSON Server on port 3001
+
+1. `npm install`
+2. Before `./src/main.js`, set for example:
+
+   ```html
+   <script>
+     window.DESKHUB_USE_REMOTE_API = true;
+     window.DESKHUB_API_BASE = 'http://localhost:3001';
+   </script>
+   ```
+
+3. Run **`npm run api`** in another terminal.
+
+Verify the API (remote only):
 
 ```bash
 npm run verify:api
 ```
 
-Or open `http://localhost:3001/tickets` in a browser.
+## Feature map
 
-## Tickets list (`public/tickets.html`)
+| Area | Behavior |
+|------|----------|
+| **Dashboard** | One `listTickets()` call; four stat cards (**Total**, **Open**, **In progress**, **Resolved + closed**) using parallel `Promise.all` over derived counts (swap for four `HEAD`/`GET` calls + `X-Total-Count` when your API supports it). **Recent 5** tickets by `createdAt`, linking to detail. |
+| **Tickets list** | Search, status (including **`resolved + closed`** → URL `status=done`), priority, assignee, sort, pagination; URL sync via `history.replaceState`. |
+| **Ticket detail** | Patch status / priority / assignee; threaded **comments** (sorted by `createdAt` ascending); POST comment → refetch → re-render → clear textarea; delete with confirm. |
+| **UI** | Toast stack (max 5, fade in/out), **full-screen loader** for dashboard load and ticket detail load, confirm dialog and new-ticket **modal** entrance motion. |
 
-Open **`/public/tickets.html`** after signing in on **`/`**. In **local mode**, users and tickets come from **`db.json`**. Use **Retry** if loading `db.json` fails (wrong server root or missing file).
-
-## Optional config (in HTML before `main.js`)
+## Optional HTML flags (before `main.js`)
 
 ```html
 <script>
-  // Use real API + server.cjs instead of in-browser db.json:
   // window.DESKHUB_USE_REMOTE_API = true;
   // window.DESKHUB_API_BASE = 'http://localhost:3001';
+  // window.DESKHUB_DB_JSON_URL = '/custom/path/db.json';
   // window.DESKHUB_LOGIN_PATH = '/auth/login';
   // window.DESKHUB_ME_PATH = '/auth/me';
   // window.DESKHUB_LOGOUT_PATH = '/auth/logout';
 </script>
 ```
 
-## Remote auth endpoints (when `DESKHUB_USE_REMOTE_API` is true)
+## Architecture (short)
 
-| Action | Path |
-|--------|------|
-| Login | `POST /auth/login` — body `{ email, password }` |
-| Current user | `GET /auth/me` — `Authorization: Bearer <token>` |
-| Logout | `POST /auth/logout` — bearer; local storage is always cleared |
+- **`src/main.js`** — `data-page` on `<body>` dispatches to page modules.
+- **`src/api/*.js`** — auth, users, tickets; local vs remote decided by `DESKHUB_USE_REMOTE_API`.
+- **`src/utils/ticketQuery.js`** — client-side list filtering, sort, pagination, URL query parse/build (includes `status=done` for resolved + closed).
+- **`src/modules/ui.js`** — toasts, confirm, page loader.
+- **`styles/main.css`** — dark theme, layout, responsive tweaks from **768px** up.
+
+## Limitations
+
+- **GitHub Pages / static hosting:** writes stay in **session** unless you add a real backend or a service worker persistence strategy; `db.json` is the seed, not a live shared database.
+- **Remote API:** must match the shapes expected by the modules (tickets, users, comments) or adapt the API layer.
+- **Screens:** layout is tuned for phones first and **768px+** for wider grids; very small viewports may scroll more on the tickets toolbar.
+
+## Smoke test (fresh clone)
+
+1. `npm start` from repo root; open `/`.
+2. Log in with a `db.json` user / `password`; confirm redirect to dashboard.
+3. Dashboard: four counts load; **Recent** links open detail.
+4. Open **Tickets**; create a ticket; filter by status including **resolved + closed**; open row → detail.
+5. Change status/priority/assignee; add a comment; confirm empty state when there are no comments on a new ticket.
+6. Delete ticket from detail (confirm); ensure list updates.
+7. **Log out** from dashboard; confirm login page.
+
+## Screenshots
+
+Add your own under `docs/screenshots/` (or the host of your choice) when you ship; none are committed here by default.
 
 ## GitHub Pages
 
-Push `index.html`, `dashboard.html`, **`db.json`**, `public/tickets.html`, `styles/`, `src/`, and `.nojekyll` as needed. No build step. For **remote** API, set `window.DESKHUB_USE_REMOTE_API` and `window.DESKHUB_API_BASE` in HTML.
+Ship `index.html`, `signup.html`, `dashboard.html`, `db.json`, `public/`, `src/`, `styles/`, and `.nojekyll` if needed. For remote API, inject the `window.DESKHUB_*` script as above.

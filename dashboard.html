@@ -11,8 +11,9 @@
     <header class="app-bar" role="banner">
       <span class="app-bar__brand">Deskhub</span>
       <nav class="app-bar__nav" aria-label="Primary">
-        <a href="./public/tickets.html" class="app-bar__nav-link app-bar__nav-link--active">Tickets</a>
-        <button type="button" id="logout-btn" class="form__submit form__submit--secondary">Log out</button>
+        <a href="./public/tickets.html" class="app-bar__nav-link">Tickets</a>
+        <span class="app-bar__nav-link app-bar__nav-link--active" aria-current="page">Dashboard</span>
+        <button type="button" id="logout-btn" class="btn btn--secondary">Log out</button>
       </nav>
     </header>
     <main class="app-shell__main page page--dashboard">
@@ -22,10 +23,14 @@
         <h2 id="overview-heading" class="dashboard-overview__title">Ticket overview</h2>
         <p id="dashboard-stats-loading" class="dashboard-stats-loading" role="status">Loading ticket counts…</p>
         <p id="dashboard-stats-error" class="dashboard-stats-error" role="alert" hidden></p>
-        <ul id="dashboard-stats-list" class="stat-grid" hidden></ul>
+        <ul id="dashboard-stats-list" class="stat-grid stat-grid--four" hidden></ul>
       </section>
 
-     <!-- <button type="button" id="logout-btn" class="form__submit form__submit--secondary">Log out</button> -->
+      <section class="dashboard-recent" aria-labelledby="recent-heading">
+        <h2 id="recent-heading" class="dashboard-overview__title">Recent tickets</h2>
+        <p id="dashboard-recent-empty" class="empty-state" hidden>No tickets yet. Open the list and create one.</p>
+        <div id="dashboard-recent" class="dashboard-recent__wrap"></div>
+      </section>
     </main>
   </div>
 
