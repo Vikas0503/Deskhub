@@ -340,7 +340,7 @@ export async function refresh(ui) {
     errorMsg.textContent =
       err instanceof Error
         ? err.message
-        : 'Could not load tickets. If you use local data, ensure db.json is reachable. If you use json-server, start it and set DESKHUB_USE_REMOTE_API.';
+        : 'Could not load tickets. If the API is enabled, run `npm run api`. For offline mode, set `window.DESKHUB_USE_LOCAL_API = true` before main.js and ensure db.json is reachable.';
   } finally {
     hidePageLoader();
   }

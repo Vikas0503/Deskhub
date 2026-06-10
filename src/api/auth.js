@@ -9,6 +9,7 @@ const LOCAL_SEED_PASSWORD = 'password';
 
 /** Optional overrides: `window.DESKHUB_LOGIN_PATH`, etc. */
 const LOGIN_PATH = globalThis.DESKHUB_LOGIN_PATH ?? '/auth/login';
+const REGISTER_PATH = globalThis.DESKHUB_REGISTER_PATH ?? '/auth/register';
 const ME_PATH = globalThis.DESKHUB_ME_PATH ?? '/auth/me';
 const LOGOUT_PATH = globalThis.DESKHUB_LOGOUT_PATH ?? '/auth/logout';
 
@@ -52,7 +53,9 @@ function stripPassword(user) {
  */
 export async function signup({ name, email, password }) {
   if (useRemoteApi()) {
-    throw new Error('Sign up is only set up for local (browser) mode in this demo.');
+    await post(REGISTER_PATH, { name, email, password });
+    clearUsersCache();
+    return;
   }
   await registerUser({ name, email, password });
   clearUsersCache();
