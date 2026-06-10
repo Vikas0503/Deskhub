@@ -1,5 +1,6 @@
 import * as auth from '../api/auth.js';
 import { ApiError } from '../api/client.js';
+import { showPageLoader, hidePageLoader } from './ui.js';
 
 function setError(el, message) {
   if (!el) return;
@@ -39,6 +40,7 @@ export function initSignupPage() {
       return;
     }
 
+    showPageLoader('Creating account…');
     try {
       await auth.signup({ name, email, password });
       window.location.assign('./index.html?registered=1');
@@ -46,6 +48,8 @@ export function initSignupPage() {
       const message =
         err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Sign up failed.';
       setError(errorEl, message);
+    } finally {
+      hidePageLoader();
     }
   });
 }

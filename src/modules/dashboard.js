@@ -6,7 +6,6 @@ import * as ticketsApi from '../api/tickets.js';
 import { showPageLoader, hidePageLoader } from './ui.js';
 
 const TICKETS_LIST_URL = './public/tickets.html';
-const TICKET_DETAIL_URL = './public/ticket-detail.html';
 
 /** Normalised status string for comparisons. */
 function ticketStatusLower(t) {
@@ -120,7 +119,7 @@ function renderRecentTickets(container, emptyEl, tickets) {
     const li = document.createElement('li');
     const link = document.createElement('a');
     link.className = 'dashboard-recent__link';
-    link.href = `${TICKET_DETAIL_URL}?id=${encodeURIComponent(id)}`;
+    link.href = `${TICKETS_LIST_URL}?ticket=${encodeURIComponent(id)}`;
 
     const idLabel = document.createElement('strong');
     idLabel.textContent = id ? `#${id}` : '—';

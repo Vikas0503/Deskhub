@@ -1,5 +1,6 @@
 import * as auth from '../api/auth.js';
 import { ApiError } from '../api/client.js';
+import { showPageLoader, hidePageLoader } from './ui.js';
 
 function setError(el, message) {
   if (!el) return;
@@ -25,12 +26,15 @@ export function initLoginPage() {
       return;
     }
 
+    showPageLoader('Signing in…');
     try {
       await auth.login({ email, password });
       window.location.assign('./dashboard.html');
     } catch (err) {
       const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Login failed.';
       setError(errorEl, message);
+    } finally {
+      hidePageLoader();
     }
   });
 }

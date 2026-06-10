@@ -1,7 +1,6 @@
 /**
- * Ticket detail page: shows one ticket, its comments, and lets you edit
- * status / priority / assignee plus an optional new comment. Nothing is sent
- * to the server until you click **Save changes**.
+ * Shared ticket detail UI: load ticket + comments, edit fields + comment, save, delete.
+ * Used from the standalone detail page (`document`) or the tickets list modal (`modal` root).
  */
 import * as auth from '../api/auth.js';
 import * as ticketsApi from '../api/tickets.js';
@@ -23,6 +22,50 @@ const PRIORITY_LABELS = /** @type {Record<string, string>} */ ({
   medium: 'Medium',
   high: 'High',
   urgent: 'Urgent',
+});
+
+/** Element ids on `public/ticket-detail.html` (standalone page). */
+export const PAGE_DETAIL_IDS = /** @type {const} */ ({
+  error: 'detail-error',
+  commentBody: 'comment-body',
+  comments: 'detail-comments',
+  commentsEmpty: 'detail-comments-empty',
+  commentError: 'comment-error',
+  statusSelect: 'detail-status-select',
+  statusError: 'detail-status-error',
+  prioritySelect: 'detail-priority-select',
+  priorityError: 'detail-priority-error',
+  assigneeSelect: 'detail-assignee-select',
+  assigneeError: 'detail-assignee-error',
+  saveBtn: 'detail-save-btn',
+  saveError: 'detail-save-error',
+  deleteBtn: 'detail-delete-btn',
+  detailId: 'detail-id',
+  detailTitle: 'detail-title',
+  detailCustomer: 'detail-customer',
+  detailCreated: 'detail-created',
+});
+
+/** Element ids inside `#ticket-detail-modal` on `public/tickets.html`. */
+export const MODAL_DETAIL_IDS = /** @type {const} */ ({
+  error: 'tdm-detail-error',
+  commentBody: 'tdm-comment-body',
+  comments: 'tdm-detail-comments',
+  commentsEmpty: 'tdm-detail-comments-empty',
+  commentError: 'tdm-comment-error',
+  statusSelect: 'tdm-detail-status-select',
+  statusError: 'tdm-detail-status-error',
+  prioritySelect: 'tdm-detail-priority-select',
+  priorityError: 'tdm-detail-priority-error',
+  assigneeSelect: 'tdm-detail-assignee-select',
+  assigneeError: 'tdm-detail-assignee-error',
+  saveBtn: 'tdm-detail-save-btn',
+  saveError: 'tdm-detail-save-error',
+  deleteBtn: 'tdm-detail-delete-btn',
+  detailId: 'tdm-detail-id',
+  detailTitle: 'tdm-detail-title',
+  detailCustomer: 'tdm-detail-customer',
+  detailCreated: 'tdm-detail-created',
 });
 
 /** @param {HTMLSelectElement} sel */
@@ -82,11 +125,6 @@ function fillAssigneeDetailSelect(sel) {
   }
 }
 
-function setText(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
-}
-
 /** @param {unknown} c */
 function commentAuthorName(c) {
   if (!c || typeof c !== 'object') return '—';
@@ -94,7 +132,6 @@ function commentAuthorName(c) {
   return displayName(getUserById(o.authorId));
 }
 
-/** Oldest first for a simple conversation thread. */
 function compareCommentsOldestFirst(a, b) {
   const ta = a && typeof a === 'object' ? /** @type {{ createdAt?: unknown }} */ (a).createdAt : null;
   const tb = b && typeof b === 'object' ? /** @type {{ createdAt?: unknown }} */ (b).createdAt : null;
@@ -113,11 +150,9 @@ function renderComments(list, container, emptyEl) {
   if (!container) return;
   container.replaceChildren();
   const sorted = [...list].sort(compareCommentsOldestFirst);
-
   if (emptyEl) {
     emptyEl.hidden = sorted.length > 0;
   }
-
   for (const raw of sorted) {
     if (!raw || typeof raw !== 'object') continue;
     const c = /** @type {Record<string, unknown>} */ (raw);
@@ -155,7 +190,6 @@ function showError(el, msg) {
  * @param {HTMLSelectElement} statusSelect
  * @param {HTMLSelectElement} prioritySelect
  * @param {HTMLSelectElement} assigneeSelect
- * @returns {Record<string, unknown>}
  */
 function buildTicketPatch(saved, statusSelect, prioritySelect, assigneeSelect) {
   /** @type {Record<string, unknown>} */
@@ -174,37 +208,49 @@ function currentUserAuthorId() {
   return /** @type {{ id?: unknown }} */ (me).id ?? null;
 }
 
-export function initTicketDetailPage() {
-  if (!auth.isAuthenticated()) {
-    window.location.replace('../index.html');
-    return;
-  }
+/**
+ * @param {ParentNode} root
+ * @param {typeof PAGE_DETAIL_IDS} ids
+ */
+function queryDetail(root, ids) {
+  /** @param {keyof typeof PAGE_DETAIL_IDS} key */
+  return (key) => root.querySelector(`#${/** @type {Record<string,string>} */ (ids)[key]}`);
+}
 
-  const params = new URLSearchParams(window.location.search);
-  const idRaw = params.get('id');
-  const ticketId = idRaw != null && idRaw !== '' ? idRaw : null;
+/**
+ * @param {typeof PAGE_DETAIL_IDS} ids
+ * @param {ParentNode} root
+ * @param {string | number} ticketId
+ * @param {{ onDeleted?: () => void; deleteDelayMs?: number }} [options]
+ */
+export function initTicketDetailView(ids, root, ticketId, options = {}) {
+  const { onDeleted, deleteDelayMs = 2000 } = options;
+  let activeTicketId = ticketId;
+  const $ = queryDetail(root, ids);
 
-  const errorEl = document.getElementById('detail-error');
-  const commentBodyEl = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('comment-body'));
-  const commentsEl = document.getElementById('detail-comments');
-  const commentsEmptyEl = document.getElementById('detail-comments-empty');
-  const commentError = document.getElementById('comment-error');
-  const statusSelect = /** @type {HTMLSelectElement | null} */ (document.getElementById('detail-status-select'));
-  const statusError = document.getElementById('detail-status-error');
-  const prioritySelect = /** @type {HTMLSelectElement | null} */ (document.getElementById('detail-priority-select'));
-  const priorityError = document.getElementById('detail-priority-error');
-  const assigneeSelect = /** @type {HTMLSelectElement | null} */ (document.getElementById('detail-assignee-select'));
-  const assigneeError = document.getElementById('detail-assignee-error');
-  const saveBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('detail-save-btn'));
-  const saveError = document.getElementById('detail-save-error');
-  const deleteBtn = document.getElementById('detail-delete-btn');
+  const errorEl = /** @type {HTMLElement | null} */ ($('error'));
+  const commentBodyEl = /** @type {HTMLTextAreaElement | null} */ ($('commentBody'));
+  const commentsEl = /** @type {HTMLElement | null} */ ($('comments'));
+  const commentsEmptyEl = /** @type {HTMLElement | null} */ ($('commentsEmpty'));
+  const commentError = /** @type {HTMLElement | null} */ ($('commentError'));
+  const statusSelect = /** @type {HTMLSelectElement | null} */ ($('statusSelect'));
+  const statusError = /** @type {HTMLElement | null} */ ($('statusError'));
+  const prioritySelect = /** @type {HTMLSelectElement | null} */ ($('prioritySelect'));
+  const priorityError = /** @type {HTMLElement | null} */ ($('priorityError'));
+  const assigneeSelect = /** @type {HTMLSelectElement | null} */ ($('assigneeSelect'));
+  const assigneeError = /** @type {HTMLElement | null} */ ($('assigneeError'));
+  const saveBtn = /** @type {HTMLButtonElement | null} */ ($('saveBtn'));
+  const saveError = /** @type {HTMLElement | null} */ ($('saveError'));
+  const deleteBtn = /** @type {HTMLButtonElement | null} */ ($('deleteBtn'));
 
-  /** Values last loaded from (or saved to) the server — used to detect unsaved edits. */
   /** @type {{ status: string; priority: string; assigneeKey: string } | null} */
   let lastSavedFields = null;
-
-  /** True while we are filling the form from the server (ignore stray “change” events). */
   let loadingFromServer = false;
+
+  function setDetailText(key, text) {
+    const el = /** @type {HTMLElement | null} */ ($(key));
+    if (el) el.textContent = text;
+  }
 
   function updateSaveButton() {
     if (!saveBtn || !statusSelect || !prioritySelect || !assigneeSelect || !lastSavedFields) {
@@ -216,21 +262,9 @@ export function initTicketDetailPage() {
       prioritySelect.value !== lastSavedFields.priority ||
       assigneeSelect.value !== lastSavedFields.assigneeKey;
     const hasNewComment = (commentBodyEl?.value?.trim() ?? '') !== '';
-    const hasSomethingToSave = ticketChanged || hasNewComment;
-    saveBtn.disabled = !hasSomethingToSave || loadingFromServer;
+    saveBtn.disabled = !(ticketChanged || hasNewComment) || loadingFromServer;
   }
 
-  if (!ticketId) {
-    if (errorEl) {
-      errorEl.hidden = false;
-      errorEl.textContent = 'Missing ticket id.';
-    }
-    return;
-  }
-
-  /**
-   * @param {Record<string, unknown>} ticket
-   */
   function fillFormFromTicket(ticket) {
     if (statusSelect) {
       resetStatusSelectOptions(statusSelect);
@@ -251,7 +285,6 @@ export function initTicketDetailPage() {
       const optionExists = key && [...assigneeSelect.options].some((o) => o.value === key);
       assigneeSelect.value = optionExists ? key : '';
     }
-
     lastSavedFields = {
       status: statusSelect?.value ?? '',
       priority: prioritySelect?.value ?? '',
@@ -275,22 +308,19 @@ export function initTicketDetailPage() {
     try {
       await ensureUsersLoaded();
       const [ticket, comments] = await Promise.all([
-        ticketsApi.getTicket(ticketId),
-        ticketsApi.listComments(ticketId),
+        ticketsApi.getTicket(activeTicketId),
+        ticketsApi.listComments(activeTicketId),
       ]);
-
       if (!ticket || typeof ticket !== 'object') throw new Error('Invalid ticket');
       const t = /** @type {Record<string, unknown>} */ (ticket);
 
-      setText('detail-id', t.id != null ? `#${t.id}` : '—');
-      setText('detail-title', typeof t.title === 'string' ? t.title : '—');
-      setText('detail-customer', typeof t.customer === 'string' ? t.customer : '—');
-      setText('detail-created', formatDateTime(t.createdAt ?? t.created ?? null));
+      setDetailText('detailId', t.id != null ? `#${t.id}` : '—');
+      setDetailText('detailTitle', typeof t.title === 'string' ? t.title : '—');
+      setDetailText('detailCustomer', typeof t.customer === 'string' ? t.customer : '—');
+      setDetailText('detailCreated', formatDateTime(t.createdAt ?? t.created ?? null));
 
       fillFormFromTicket(t);
-
       if (commentBodyEl) commentBodyEl.value = '';
-
       renderComments(Array.isArray(comments) ? comments : [], commentsEl, commentsEmptyEl);
     } catch (err) {
       lastSavedFields = null;
@@ -317,7 +347,6 @@ export function initTicketDetailPage() {
 
   saveBtn?.addEventListener('click', async () => {
     if (!saveBtn || !statusSelect || !prioritySelect || !assigneeSelect || !lastSavedFields) return;
-
     hideError(saveError);
     hideError(statusError);
     hideError(priorityError);
@@ -326,25 +355,22 @@ export function initTicketDetailPage() {
 
     const patch = buildTicketPatch(lastSavedFields, statusSelect, prioritySelect, assigneeSelect);
     const newCommentText = commentBodyEl?.value?.trim() ?? '';
-
-    if (Object.keys(patch).length === 0 && !newCommentText) {
-      return;
-    }
-
+    if (Object.keys(patch).length === 0 && !newCommentText) return;
     if (newCommentText && currentUserAuthorId() == null) {
       showError(commentError, 'Not signed in.');
       return;
     }
 
     saveBtn.disabled = true;
+    showPageLoader('Saving…');
     try {
       if (Object.keys(patch).length > 0) {
-        await ticketsApi.updateTicket(ticketId, patch);
+        await ticketsApi.updateTicket(activeTicketId, patch);
       }
       if (newCommentText) {
         const authorId = currentUserAuthorId();
         await ticketsApi.addComment({
-          ticketId: Number(ticketId) || ticketId,
+          ticketId: Number(activeTicketId) || activeTicketId,
           authorId,
           body: newCommentText,
         });
@@ -356,6 +382,8 @@ export function initTicketDetailPage() {
       showError(saveError, msg);
       showToast(msg, { variant: 'error' });
       updateSaveButton();
+    } finally {
+      hidePageLoader();
     }
   });
 
@@ -367,16 +395,36 @@ export function initTicketDetailPage() {
       cancelLabel: 'Cancel',
     });
     if (!ok) return;
+    showPageLoader('Deleting ticket…');
     try {
-      await ticketsApi.deleteTicket(ticketId);
+      if (deleteDelayMs > 0) {
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, deleteDelayMs);
+        });
+      }
+      await ticketsApi.deleteTicket(activeTicketId);
       showToast('Ticket deleted', { variant: 'success' });
-      window.setTimeout(() => {
+      if (onDeleted) {
+        onDeleted();
+      } else {
         window.location.assign('./tickets.html');
-      }, 400);
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not delete ticket.', { variant: 'error' });
+    } finally {
+      hidePageLoader();
     }
   });
 
   void loadTicketPage();
+
+  return {
+    /**
+     * @param {string | number} newId
+     */
+    reopen(newId) {
+      activeTicketId = newId;
+      return loadTicketPage();
+    },
+  };
 }

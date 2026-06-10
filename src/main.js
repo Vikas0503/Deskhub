@@ -3,8 +3,10 @@ import { ensureUsersLoaded } from './api/users.js';
 import { initLoginPage } from './modules/auth.js';
 import { initSignupPage } from './modules/signup.js';
 import { initTicketsList } from './modules/tickets.js';
-import { initTicketDetailPage } from './modules/ticketDetail.js';
 import { initDashboard } from './modules/dashboard.js';
+import { initTheme } from './modules/theme.js';
+
+initTheme();
 
 const page = document.body?.dataset?.page ?? '';
 
@@ -31,6 +33,4 @@ if (page === 'login') {
   }
 } else if (page === 'tickets-list') {
   initTicketsList();
-} else if (page === 'ticket-detail') {
-  initTicketDetailPage();
 }

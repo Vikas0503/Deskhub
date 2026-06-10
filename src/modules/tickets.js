@@ -10,7 +10,9 @@ import {
 } from '../utils/ticketQuery.js';
 import { formatDateTime, formatRelative } from '../utils/formatDate.js';
 import { attachFormValidation } from './form.js';
-import { showToast } from './ui.js';
+import { showToast, showPageLoader, hidePageLoader } from './ui.js';
+import { initTicketDetailView, MODAL_DETAIL_IDS } from './ticketDetailView.js';
+import { downloadTicketsAsCsv } from '../utils/exportTicketsCsv.js';
 
 /**
  * Tickets list page: filters, table, pagination, new-ticket modal.
@@ -27,6 +29,12 @@ const state = {
   page: 1,
   pageSize: DEFAULT_PAGE_SIZE,
 };
+
+/** Preserved in the URL as `?ticket=` while the detail modal is open. */
+let urlTicketParam = /** @type {string | null} */ (null);
+
+/** Full ticket list from the last successful refresh (CSV export). */
+let ticketsExportSnapshot = /** @type {unknown[]} */ ([]);
 
 /** @param {unknown} t */
 function ticketAssigneeId(t) {
@@ -174,7 +182,11 @@ function readStateFromDom(ui) {
 function syncUrl() {
   const qs = buildQueryString(state);
   const base = `${window.location.pathname}${window.location.hash || ''}`;
-  window.history.replaceState(null, '', qs ? `${base}?${qs}` : base);
+  const sp = new URLSearchParams(qs);
+  if (urlTicketParam) sp.set('ticket', urlTicketParam);
+  else sp.delete('ticket');
+  const next = sp.toString();
+  window.history.replaceState(null, '', next ? `${base}?${next}` : base);
 }
 
 /**
@@ -255,11 +267,9 @@ export async function refresh(ui) {
     pageNumbers,
   } = ui;
 
-  // Deep links from the dashboard: `state` already matches the URL, but the
-  // HTML selects still show their defaults. Copy `state` into the DOM *before*
-  // readStateFromDom(), or it would overwrite `state` with those defaults.
-  mirrorTextFiltersFromState(ui);
-
+  // Read toolbar from the DOM first so filter / sort changes apply. After URL
+  // navigation, `initTicketsList` / `popstate` call `mirrorTextFiltersFromState`
+  // so the DOM matches `state` before we read it here.
   readStateFromDom(ui);
 
   errorWrap.hidden = true;
@@ -269,6 +279,7 @@ export async function refresh(ui) {
   paginationEl.hidden = true;
   tbody.replaceChildren();
 
+  showPageLoader('Loading tickets…');
   try {
     await ensureUsersLoaded();
     fillAssigneeSelect(ui.assigneeSelect, 'modal');
@@ -278,6 +289,7 @@ export async function refresh(ui) {
 
     const data = await ticketsApi.listTickets();
     const allTickets = Array.isArray(data) ? data.map((t) => t) : [];
+    ticketsExportSnapshot = allTickets;
 
     mergeExtraStatusOptions(filterSelect, allTickets);
 
@@ -329,6 +341,8 @@ export async function refresh(ui) {
       err instanceof Error
         ? err.message
         : 'Could not load tickets. If you use local data, ensure db.json is reachable. If you use json-server, start it and set DESKHUB_USE_REMOTE_API.';
+  } finally {
+    hidePageLoader();
   }
 }
 
@@ -338,6 +352,8 @@ export function initTicketsList() {
     return;
   }
 
+  urlTicketParam = new URLSearchParams(window.location.search).get('ticket');
+  const ticketIdFromUrl = urlTicketParam;
   applyParsedUrl(parseTicketListQuery(window.location.search));
 
   const errorWrap = document.getElementById('tickets-error');
@@ -362,6 +378,10 @@ export function initTicketsList() {
   const pageNext = document.getElementById('tickets-page-next');
   const pageIndicator = document.getElementById('tickets-page-indicator');
   const pageNumbers = document.getElementById('tickets-page-numbers');
+  const resetBtn = document.getElementById('tickets-reset-filters');
+  const exportBtn = document.getElementById('tickets-export-csv');
+  const detailModal = document.getElementById('ticket-detail-modal');
+  const detailPanel = detailModal?.querySelector('[data-tdm-panel]');
 
   if (
     !errorWrap ||
@@ -403,6 +423,54 @@ export function initTicketsList() {
     pageIndicator,
     pageNumbers,
   };
+
+  mirrorTextFiltersFromState(ui);
+
+  /** @type {{ reopen: (id: string | number) => Promise<void> } | null} */
+  let detailCtl = null;
+
+  function syncBodyModalOpen() {
+    const detailOpen = !!(detailModal && !detailModal.hidden);
+    const newOpen = !!(modal && !modal.hidden);
+    document.body.classList.toggle('modal-open', detailOpen || newOpen);
+  }
+
+  function openDetailChrome() {
+    if (!detailModal) return;
+    detailModal.hidden = false;
+    syncBodyModalOpen();
+  }
+
+  function closeTicketDetailModal() {
+    urlTicketParam = null;
+    syncUrl();
+    if (!detailModal) return;
+    detailModal.hidden = true;
+    syncBodyModalOpen();
+  }
+
+  /**
+   * @param {string | number} ticketId
+   */
+  function openTicketDetailModal(ticketId) {
+    if (!detailPanel) return;
+    urlTicketParam = String(ticketId);
+    syncUrl();
+    openDetailChrome();
+    if (!detailCtl) {
+      detailCtl = initTicketDetailView(MODAL_DETAIL_IDS, detailPanel, ticketId, {
+        onDeleted: () => {
+          urlTicketParam = null;
+          syncUrl();
+          if (detailModal) detailModal.hidden = true;
+          syncBodyModalOpen();
+          void refresh(ui);
+        },
+      });
+    } else {
+      void detailCtl.reopen(ticketId);
+    }
+  }
 
   const titleEl = /** @type {HTMLInputElement | null} */ (newTicketForm?.querySelector('#nt-title'));
   const customerEl = /** @type {HTMLInputElement | null} */ (newTicketForm?.querySelector('#nt-customer'));
@@ -489,8 +557,13 @@ export function initTicketsList() {
   });
 
   window.addEventListener('popstate', () => {
+    urlTicketParam = new URLSearchParams(window.location.search).get('ticket');
     applyParsedUrl(parseTicketListQuery(window.location.search));
-    void refresh(ui);
+    mirrorTextFiltersFromState(ui);
+    void refresh(ui).then(() => {
+      if (urlTicketParam) openTicketDetailModal(urlTicketParam);
+      else closeTicketDetailModal();
+    });
   });
 
   tbody.addEventListener('click', (e) => {
@@ -499,9 +572,46 @@ export function initTicketsList() {
     );
     if (!tr || !tbody.contains(tr)) return;
     const tid = tr.dataset.ticketId;
-    if (tid && tid !== '-') {
-      window.location.assign(`./ticket-detail.html?id=${encodeURIComponent(tid)}`);
+    if (tid && tid !== '-') openTicketDetailModal(tid);
+  });
+
+  tbody.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const tr =
+      e.target instanceof HTMLElement ? /** @type {HTMLElement | null} */ (e.target.closest('tr[data-ticket-id]')) : null;
+    if (!tr || !tbody.contains(tr)) return;
+    if (e.key === ' ') e.preventDefault();
+    const tid = tr.dataset.ticketId;
+    if (tid && tid !== '-') openTicketDetailModal(tid);
+  });
+
+  resetBtn?.addEventListener('click', () => {
+    state.q = '';
+    state.status = '';
+    state.priority = '';
+    state.assigneeId = '';
+    state.sort = 'newest';
+    state.page = 1;
+    state.pageSize = DEFAULT_PAGE_SIZE;
+    mirrorFullToolbarFromState(ui);
+    closeTicketDetailModal();
+    void refresh(ui);
+  });
+
+  exportBtn?.addEventListener('click', () => {
+    if (!ticketsExportSnapshot.length) {
+      showToast('No tickets to export yet.', { variant: 'error' });
+      return;
     }
+    downloadTicketsAsCsv(ticketsExportSnapshot);
+    showToast('CSV downloaded', { variant: 'success' });
+  });
+
+  detailModal?.querySelector('[data-tdm-panel]')?.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+  });
+  detailModal?.querySelectorAll('[data-tdm-close]').forEach((el) => {
+    el.addEventListener('click', () => closeTicketDetailModal());
   });
 
   function openModal() {
@@ -512,7 +622,7 @@ export function initTicketsList() {
       newTicketError.textContent = '';
     }
     modal.hidden = false;
-    document.body.classList.add('modal-open');
+    syncBodyModalOpen();
     newTicketForm?.reset();
     fillAssigneeSelect(ui.assigneeSelect, 'modal');
     newTicketFormCtrl?.updateSubmitDisabled();
@@ -521,7 +631,7 @@ export function initTicketsList() {
   function closeModal() {
     if (!modal) return;
     modal.hidden = true;
-    document.body.classList.remove('modal-open');
+    syncBodyModalOpen();
     if (newTicketError) {
       newTicketError.hidden = true;
       newTicketError.textContent = '';
@@ -537,7 +647,12 @@ export function initTicketsList() {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal && !modal.hidden) closeModal();
+    if (e.key !== 'Escape') return;
+    if (detailModal && !detailModal.hidden) {
+      closeTicketDetailModal();
+      return;
+    }
+    if (modal && !modal.hidden) closeModal();
   });
 
   newTicketForm?.addEventListener('submit', async (e) => {
@@ -583,6 +698,7 @@ export function initTicketsList() {
       if (Number.isFinite(aid)) payload.assigneeId = aid;
     }
 
+    showPageLoader('Creating ticket…');
     try {
       await ticketsApi.createTicket(payload);
       newTicketForm.reset();
@@ -597,6 +713,8 @@ export function initTicketsList() {
       newTicketError.textContent = err instanceof Error ? err.message : 'Could not create ticket.';
       newTicketError.hidden = false;
       showToast(newTicketError.textContent, { variant: 'error' });
+    } finally {
+      hidePageLoader();
     }
   });
 
@@ -605,5 +723,8 @@ export function initTicketsList() {
     runRefresh();
   });
 
-  void refresh(ui);
+  void (async () => {
+    await refresh(ui);
+    if (ticketIdFromUrl) openTicketDetailModal(ticketIdFromUrl);
+  })();
 }

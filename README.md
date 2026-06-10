@@ -1,13 +1,13 @@
 # Deskhub
 
-Small static helpdesk UI: **login**, **dashboard** (ticket counts + recent items), **ticket list** with filters and pagination, and **ticket detail** with status/priority/assignee updates, comments, and delete. No bundler: plain ES modules and shared CSS.
+Small static helpdesk UI: **login**, **dashboard** (ticket counts + recent items), **ticket list** with filters, pagination, **ticket detail in a modal** (edit, comments, delete), and CSV export. No bundler: plain ES modules and shared CSS.
 
 ## How to run
 
 Serve the **repository root** so these paths work together:
 
 - `/index.html`, `/signup.html`, `/dashboard.html`
-- `/public/tickets.html`, `/public/ticket-detail.html`
+- `/public/tickets.html` (includes ticket detail modal; deep link `?ticket=<id>`). Legacy `/public/ticket-detail.html?id=` redirects here.
 - `/src/…`, `/styles/main.css`, `/db.json`
 
 ```bash
@@ -54,10 +54,11 @@ npm run verify:api
 
 | Area | Behavior |
 |------|----------|
-| **Dashboard** | One `listTickets()` call; four stat cards (**Total**, **Open**, **In progress**, **Resolved + closed**) using parallel `Promise.all` over derived counts (swap for four `HEAD`/`GET` calls + `X-Total-Count` when your API supports it). **Recent 5** tickets by `createdAt`, linking to detail. |
+| **Dashboard** | One `listTickets()` call; four stat cards; **Recent 5** tickets; **Reset list filters** opens the ticket list with no query string; **Export CSV** downloads the loaded tickets. |
 | **Tickets list** | Search, status (including **`resolved + closed`** → URL `status=done`), priority, assignee, sort, pagination; URL sync via `history.replaceState`. |
-| **Ticket detail** | Patch status / priority / assignee; threaded **comments** (sorted by `createdAt` ascending); POST comment → refetch → re-render → clear textarea; delete with confirm. |
-| **UI** | Toast stack (max 5, fade in/out), **full-screen loader** for dashboard load and ticket detail load, confirm dialog and new-ticket **modal** entrance motion. |
+| **Ticket detail** | **Save changes** for fields + optional comment; delete with confirm. |
+| **Theme** | **Light / dark** toggle (header or floating on minimal pages); choice stored in `localStorage` under `deskhub-theme`. |
+| **UI** | Toast stack, **full-screen loader** on list refresh, login, signup, create ticket, save, delete, and dashboard load; confirm dialog and modal motion. |
 
 ## Optional HTML flags (before `main.js`)
 
@@ -78,7 +79,8 @@ npm run verify:api
 - **`src/api/*.js`** — auth, users, tickets; local vs remote decided by `DESKHUB_USE_REMOTE_API`.
 - **`src/utils/ticketQuery.js`** — client-side list filtering, sort, pagination, URL query parse/build (includes `status=done` for resolved + closed).
 - **`src/modules/ui.js`** — toasts, confirm, page loader.
-- **`styles/main.css`** — dark theme, layout, responsive tweaks from **768px** up.
+- **`src/modules/theme.js`** — light/dark `data-theme` on `<html>` + toggle.
+- **`styles/main.css`** — CSS variables for dark (default) and `[data-theme='light']`, layout, responsive tweaks from **768px** up.
 
 ## Limitations
 

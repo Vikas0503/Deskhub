@@ -20,7 +20,11 @@
       <section class="tickets-panel" aria-labelledby="tickets-heading">
         <div class="tickets-panel__head">
           <h1 id="tickets-heading" class="tickets-panel__title">Tickets</h1>
-          <button type="button" id="new-ticket-open" class="btn btn--primary">+ New ticket</button>
+          <div class="tickets-panel__head-actions">
+            <button type="button" id="tickets-reset-filters" class="btn btn--secondary">Reset filters</button>
+            <button type="button" id="tickets-export-csv" class="btn btn--secondary">Export CSV</button>
+            <button type="button" id="new-ticket-open" class="btn btn--primary">+ New ticket</button>
+          </div>
         </div>
 
         <div class="tickets-toolbar" role="region" aria-label="Search and filter tickets">
@@ -154,6 +158,77 @@
           <button type="submit" id="nt-submit" class="btn btn--primary">Create</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div id="ticket-detail-modal" class="modal" hidden>
+    <div class="modal__backdrop" data-tdm-close tabindex="-1" aria-hidden="true"></div>
+    <div
+      class="modal__panel panel modal__panel--ticket-detail"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tdm-detail-title"
+      data-tdm-panel
+    >
+      <div class="modal__actions modal__actions--sticky modal__actions--detail-close">
+        <button type="button" class="modal__close-x" data-tdm-close aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <p id="tdm-detail-error" class="tickets-state tickets-state--error" role="alert" hidden></p>
+      <article class="detail-card detail-card--modal">
+        <header class="detail-card__head detail-card__head--row">
+          <div>
+            <p class="detail-card__id" id="tdm-detail-id">—</p>
+            <h2 class="detail-card__title" id="tdm-detail-title">—</h2>
+          </div>
+          <button type="button" id="tdm-detail-delete-btn" class="btn btn--danger">Delete ticket</button>
+        </header>
+        <dl class="detail-meta">
+          <div><dt>Customer</dt><dd id="tdm-detail-customer">—</dd></div>
+          <div>
+            <dt>Priority</dt>
+            <dd class="detail-meta__dd--control">
+              <select id="tdm-detail-priority-select" class="detail-meta__select" aria-label="Ticket priority"></select>
+              <span id="tdm-detail-priority-error" class="detail-inline-error" role="alert" hidden></span>
+            </dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd class="detail-meta__dd--control">
+              <select id="tdm-detail-status-select" class="detail-meta__select" aria-label="Ticket status"></select>
+              <span id="tdm-detail-status-error" class="detail-inline-error" role="alert" hidden></span>
+            </dd>
+          </div>
+          <div>
+            <dt>Assignee</dt>
+            <dd class="detail-meta__dd--control">
+              <select id="tdm-detail-assignee-select" class="detail-meta__select" aria-label="Assignee"></select>
+              <span id="tdm-detail-assignee-error" class="detail-inline-error" role="alert" hidden></span>
+            </dd>
+          </div>
+          <div><dt>Created</dt><dd id="tdm-detail-created">—</dd></div>
+        </dl>
+
+        <section class="detail-comments" aria-labelledby="tdm-comments-heading">
+          <h2 id="tdm-comments-heading" class="detail-comments__title">Comments</h2>
+          <p id="tdm-detail-comments-empty" class="empty-state empty-state--tight" hidden>No comments yet.</p>
+          <div id="tdm-detail-comments" class="detail-comments__list"></div>
+
+          <div class="form form--inline-comment">
+            <span id="tdm-comment-error" class="form__error" role="alert" hidden></span>
+            <div class="form__field">
+              <label for="tdm-comment-body">Add a comment</label>
+              <textarea id="tdm-comment-body" name="body" rows="3" placeholder="Write an update…"></textarea>
+            </div>
+          </div>
+        </section>
+
+        <div class="detail-save-bar">
+          <p id="tdm-detail-save-error" class="detail-inline-error" role="alert" hidden></p>
+          <button type="button" id="tdm-detail-save-btn" class="btn btn--primary" disabled>Save changes</button>
+        </div>
+      </article>
     </div>
   </div>
 
