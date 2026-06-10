@@ -5,8 +5,10 @@ import { initSignupPage } from './modules/signup.js';
 import { initTicketsList } from './modules/tickets.js';
 import { initDashboard } from './modules/dashboard.js';
 import { initTheme } from './modules/theme.js';
+import { initKeyboardShortcuts } from './modules/keyboardShortcuts.js';
 
 initTheme();
+initKeyboardShortcuts();
 
 const page = document.body?.dataset?.page ?? '';
 

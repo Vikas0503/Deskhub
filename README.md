@@ -83,6 +83,7 @@ You can also force remote off with `window.DESKHUB_USE_REMOTE_API = false`.
 | **Ticket detail** | Modal on list page: save fields + optional comment; delete with confirm. |
 | **Theme** | Light / dark toggle (sun/moon); stored in `localStorage` under `deskhub-theme`. |
 | **UI** | Toasts, full-screen loader, confirm dialog. |
+| **Keyboard** | **`?`** or **Shift+/** — shortcut help (toast). **Tickets:** **`/`** search, **`n`** new ticket, **`r`** reset filters, **`e`** export CSV, **`d`** dashboard (not while typing in a field). **Dashboard:** **`t`** tickets. **Login / signup:** **`/`** focus first form field. **Esc** closes modals on the tickets page (existing). |
 
 ---
 
@@ -110,7 +111,7 @@ You can also force remote off with `window.DESKHUB_USE_REMOTE_API = false`.
 - **`server.cjs`** — json-server + `/auth/*` for local development.
 - **`src/utils/ticketQuery.js`** — client-side list filtering, sort, pagination, URL query parse/build.
 - **`src/modules/ui.js`** — toasts, confirm, page loader.
-- **`src/modules/theme.js`** — light/dark `data-theme` on `<html>` + toggle.
+- **`src/modules/keyboardShortcuts.js`** — global shortcuts (`?` help, `/` `n` `r` `e` `d` `t` by page).
 
 ---
 
